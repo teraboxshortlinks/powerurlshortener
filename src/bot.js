@@ -8,7 +8,7 @@ app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-const port = 3000;
+const port = 8080;
 app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
@@ -34,7 +34,7 @@ bot.onText(/\/start/, (msg) => {
   + '✅3. Then add your API using command /setapi \n\n' 
   + 'Example: /setapi c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
   + '⚠️ You must have to send link with https:// or http://\n\n'
-  + '<b>Made with ❤️ By: @jit362</b>';
+  + 'Made with ❤️ By: @jit362';
   + '**Now, go ahead and try it out!**';
 
   bot.sendMessage(chatId, welcomeMessage);
