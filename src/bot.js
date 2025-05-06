@@ -24,18 +24,25 @@ bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const username = msg.from.username;
   const welcomeMessage = `😇 Hello, ${username}!\n\n`
-    + 'Welcome to the Indishort URL Shortener Bot!\n'
-    + 'You can use this bot to shorten URLs using the Indishort.live api service.\n\n'
-    + 'To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
-    + 'If you haven\'t set your Indishort API token yet, use the command:\n/setapi YOUR_Indishort_API_TOKEN\n\n'
-    + 'How To Use Me 👇👇 \n\n'
-  + '✅1. Got To https://indishort.live & Complete Your Registration.\n\n'
-  + '✅2. Then Copy Your API Key from here https://indishort.live/member/tools/api Copy Your API Only. \n\n'
-  + '✅3. Then add your API using command /setapi \n\n' 
-  + 'Example: /setapi c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
-  + '⚠️ You must have to send link with https:// or http://\n\n'
-  + 'Made with ❤️ By: @jit362';
-  + '**Now, go ahead and try it out!**';
+I am botlatournament.xyz , Bulk Link Converter. I Can Convert Links Directly From Your teraboxshortlinks.xyz Account,
+    
+1. Go To 👉 https://botlatournament.xyz/member/tools/api
+2. Then Copy API Key
+3. Then Type /setapi then give a single space and then paste your API Key (see example to  understand more...)
+4. How to use botlatournament bot- use this video for reference 👉 https://t.me/teraboxshortlinks
+
+(See Example.👇)
+Example: /api 04e8ee10b5f123456a640c8f33195abc 
+
+🤘 Hit 👉 /features To Know More Features Of This Bot.
+🔗 Hit 👉 /link To Know More About How To Link botlatournament.xyz Account To This Bot.
+💁‍♀ Hit 👉 /help To Get Help.
+➕ Hit 👉 /add Command To Get Help About Adding your channel to bot.
+➕ Hit 👉 /footer To Get Help About Adding your Custom Footer to bot.
+
+Anyone who want to use any other shortner instead of botlatournament.xyz than contact at 👉 https://t.me/teraboxshortlinks (all shortners support avilable.)
+
+- Made With ❤️ By https://t.me/teraboxshortlinks -
 
   bot.sendMessage(chatId, welcomeMessage);
 });
@@ -45,10 +52,10 @@ bot.onText(/\/setapi (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   const userToken = match[1].trim();
 
-  // Save the user's AdlinkFly API token to the database
+  // Save the user's botlatournament API token to the database
   saveUserToken(chatId, userToken);
 
-  const response = `Your Indishort API token set successfully. ✅️✅️ Your token is: ${userToken}`;
+  const response = `Your teraboxshortlinks API token set successfully. ✅️✅️ Your token is: ${userToken}`;
   bot.sendMessage(chatId, response);
 });
 
@@ -121,13 +128,13 @@ async function shortenMultipleLinks(chatId, links) {
 async function shortenUrl(chatId, url) {
   const adlinkflyToken = getUserToken(chatId);
 
-  if (!adlinkflyToken) {
-    bot.sendMessage(chatId, 'Please set up 🎃 your INDISHORT API token first. 🔮 Use the command: /setapi YOUR_INDISHORT_API_TOKEN');
+  if (!botlatournamentToken) {
+    bot.sendMessage(chatId, 'Please set up 🎃 your botlatournament API token first. 🔮 Use the command: /setapi YOUR_BOTLATOURNAMENT_API_TOKEN');
     return null;
   }
 
   try {
-    const apiUrl = `https://indishort.live/api?api=${adlinkflyToken}&url=${encodeURIComponent(url)}`;
+    const apiUrl = `https://botlatournament/api?api=${botlatournamentToken}&url=${encodeURIComponent(url)}`;
     const response = await axios.get(apiUrl);
     return response.data.shortenedUrl;
   } catch (error) {
@@ -136,14 +143,14 @@ async function shortenUrl(chatId, url) {
   }
 }
 
-// Function to save user's AdlinkFly API token
+// Function to save user's botlatournament API token
 function saveUserToken(chatId, token) {
   const dbData = getDatabaseData();
   dbData[chatId] = token;
   fs.writeFileSync('./src/database.json', JSON.stringify(dbData, null, 2));
 }
 
-// Function to retrieve user's AdlinkFly API token
+// Function to retrieve user's botlatournament API token
 function getUserToken(chatId) {
   const dbData = getDatabaseData();
   return dbData[chatId];
