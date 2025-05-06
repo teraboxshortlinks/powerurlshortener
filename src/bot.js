@@ -127,7 +127,7 @@ async function shortenUrl(chatId, url) {
   }
 
   try {
-    const apiUrl = `https://indishort.live/api?api=${adlinkflyToken}&url=${encodeURIComponent(url)}`;
+    const apiUrl = `https://botlatournament.xyz/api?api=${adlinkflyToken}&url=${encodeURIComponent(url)}`;
     const response = await axios.get(apiUrl);
     return response.data.shortenedUrl;
   } catch (error) {
