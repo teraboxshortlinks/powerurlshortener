@@ -33,11 +33,11 @@ bot.onText(/\/start/, (msg) => {
 (See Example.👇)
 Example: /setapi 04e8ee10b5f123456a640c8f33195abc 
 
-🤘 Hit 👉 /features To Know More Features Of This Bot.
-🔗 Hit 👉 /link To Know More About How To Link teraboxlinks.com Account To This Bot.
-💁‍♀ Hit 👉 /help To Get Help.
-➕ Hit 👉 /add Command To Get Help About Adding your channel to bot.
-➕ Hit 👉 /footer To Get Help About Adding your Custom Footer to bot.
+🤘 Hit 👉 features To Know More Features Of This Bot.
+🔗 Hit 👉 link To Know More About How To Link teraboxlinks.com Account To This Bot.
+💁‍♀ Hit 👉 help To Get Help.
+➕ Hit 👉 add Command To Get Help About Adding your channel to bot.
+➕ Hit 👉 footer To Get Help About Adding your Custom Footer to bot.
 
 Anyone who want to use any other shortner instead of botlatournament.xyz than contact at 👉 https://t.me/+m7j-b56KOXkyNDA9 (all shortners support avilable.)
 
@@ -128,7 +128,7 @@ async function shortenUrl(chatId, url) {
   const adlinkflyToken = getUserToken(chatId);
 
   if (!adlinkflyToken) {
-    bot.sendMessage(chatId, 'Please set up 🎃 your Botla Tournament API token first. 🔮 Use the command: /setapi YOUR_BOTLATOURNAMENT_API_TOKEN');
+    bot.sendMessage(chatId, 'Please set up 🎃 your BotlaTournament API token first. 🔮 Use the command: /setapi YOUR_BOTLATOURNAMENT_API_TOKEN');
     return null;
   }
 
