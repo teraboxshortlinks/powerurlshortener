@@ -31,7 +31,7 @@ bot.onText(/\/start/, (msg) => {
     + 'How To Use Me 👇👇 \n\n botlatournament.xyz & Complete Your Registration.\n\n'
   + '✅2. Then Copy Your API Key from here https://botlatournament.xyz/member/tools/api Copy Your API Only. \n\n'
   + '✅3. Then add your API using command /api \n\n' 
-  + 'Example: /setapi c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
+  + 'Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
   + '⚠️ You must have to send link with https:// or http://\n\n'
   + 'Made with ❤️ By: https://t.me/teraboxshortlinks';
   + '**Now, go ahead and try it out!**';
