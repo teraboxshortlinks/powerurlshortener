@@ -48,7 +48,7 @@ bot.onText(/\/setapi (.+)/, (msg, match) => {
   // Save the user's AdlinkFly API token to the database
   saveUserToken(chatId, userToken);
 
-  const response = `Your botlatournamentIndishort API token set successfully. ✅️✅️ Your token is: ${userToken}`;
+  const response = `Your botlatournament API token set successfully. ✅️✅️ Your token is: ${userToken}`;
   bot.sendMessage(chatId, response);
 });
 
