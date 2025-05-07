@@ -27,11 +27,11 @@ bot.onText(/\/start/, (msg) => {
     
 1. Go To 👉 https://botlatournament.xyz/member/tools/api
 2. Then Copy API Key
-3. Then Type /api then give a single space and then paste your API Key (see example to understand more...)
+3. Then Type /setapi then give a single space and then paste your API Key (see example to understand more...)
 4. How to use teraboxlinks bot- use this video for reference 👉 https://t.me/+m7j-b56KOXkyNDA9
 
 (See Example.👇)
-Example: /api 04e8ee10b5f123456a640c8f33195abc 
+Example: /setapi 04e8ee10b5f123456a640c8f33195abc 
 
 🤘 Hit 👉 /features To Know More Features Of This Bot.
 🔗 Hit 👉 /link To Know More About How To Link teraboxlinks.com Account To This Bot.
