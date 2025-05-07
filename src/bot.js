@@ -28,11 +28,7 @@ bot.onText(/\/start/, (msg) => {
     + 'You can use this bot to shorten URLs using the botlatournament.xyz api service.\n\n'
     + 'To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
     + 'If you haven\'t set your botlatournament API token yet, use the command:\n/api YOUR_botlatournament_API_TOKEN\n\n'
-    + 'How To Use Me 👇👇 \n\n'
-  + '✅1. Got To https://. Go To 👉 https://botlatournament.xyz/member/tools/api
-(See Example.👇)
-Example: /api 04e8ee10b5f123456a640c8f33195abc 
-.live & Complete Your Registration.\n\n'
+    + 'How To Use Me 👇👇 \n\n botlatournament.xyz & Complete Your Registration.\n\n'
   + '✅2. Then Copy Your API Key from here https://botlatournament.xyz/member/tools/api Copy Your API Only. \n\n'
   + '✅3. Then add your API using command /api \n\n' 
   + 'Example: /setapi c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
