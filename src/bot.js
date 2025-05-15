@@ -24,16 +24,16 @@ bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const username = msg.from.username;
   const welcomeMessage = `😇 Hello, ${username}!\n\n`
-    + 'Welcome to the botlatournament.xyz URL Shortener Bot!\n'
-    + 'You can use this bot to shorten URLs using the botlatournament.xyz api service.\n\n'
+    + 'Welcome to the powerurlshortener.link URL Shortener Bot!\n'
+    + 'You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
     + 'To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
-    + 'If you haven\'t set your botlatournament API token yet, use the command:\n/api YOUR_botlatournament_API_TOKEN\n\n'
-    + 'How To Use Me 👇👇 \n\n botlatournament.xyz & Complete Your Registration.\n\n'
-  + '✅2. Then Copy Your API Key from here https://botlatournament.xyz/member/tools/api Copy Your API Only. \n\n'
+    + 'If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
+    + 'How To Use Me 👇👇 \n\n powerurlshortener.link & Complete Your Registration.\n\n'
+  + '✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. \n\n'
   + '✅3. Then add your API using command /api \n\n' 
   + 'Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
   + '⚠️ You must have to send link with https:// or http://\n\n'
-  + 'Made with ❤️ By: https://t.me/teraboxshortlinks';
+  + 'Made with ❤️ By: https://t.me/powerurlshortener';
   + '**Now, go ahead and try it out!**';
 
   bot.sendMessage(chatId, welcomeMessage);
@@ -44,10 +44,10 @@ bot.onText(/\/api (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   const userToken = match[1].trim();
 
-  // Save the user's botlatournament API token to the database
+  // Save the user's powerurlshortener API token to the database
   saveUserToken(chatId, userToken);
 
-  const response = `Your botlatournament API token set successfully. ✅️✅️ Your token is: ${userToken}`;
+  const response = `Your powerurlshortener API token set successfully. ✅️✅️ Your token is: ${userToken}`;
   bot.sendMessage(chatId, response);
 });
 
@@ -121,12 +121,12 @@ async function shortenUrl(chatId, url) {
   const adlinkflyToken = getUserToken(chatId);
 
   if (!adlinkflyToken) {
-    bot.sendMessage(chatId, 'Please set up 🎃 your botlatournament API token first. 🔮 Use the command: /setapi YOUR_botlatournament_API_TOKEN');
+    bot.sendMessage(chatId, 'Please set up your powerurlshortener.link API token first. Use the command: /api YOUR_powerurlshortener_API_TOKEN');
     return null;
   }
 
   try {
-    const apiUrl = `https://botlatournament.xyz/api?api=${adlinkflyToken}&url=${encodeURIComponent(url)}`;
+    const apiUrl = `https://powerurlshortener.link/api?api=${adlinkflyToken}&url=${encodeURIComponent(url)}`;
     const response = await axios.get(apiUrl);
     return response.data.shortenedUrl;
   } catch (error) {
@@ -135,14 +135,14 @@ async function shortenUrl(chatId, url) {
   }
 }
 
-// Function to save user's botlatournament API token
+// Function to save user's powerurlshortener API token
 function saveUserToken(chatId, token) {
   const dbData = getDatabaseData();
   dbData[chatId] = token;
   fs.writeFileSync('./src/database.json', JSON.stringify(dbData, null, 2));
 }
 
-// Function to retrieve user's botlatournament API token
+// Function to retrieve user's powerurlshortener API token
 function getUserToken(chatId) {
   const dbData = getDatabaseData();
   return dbData[chatId];
