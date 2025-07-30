@@ -85,7 +85,7 @@ function getUserHeaderFooter(chatId) {
   const customFooter = dbData[chatId]?.footer || '';
 
   return {
-    header: `🔗 Shortened Links:\\n${customHeader ? customHeader + '\\n' : ''}`,
+    header: `🔗 Links:\\n${customHeader ? customHeader + '\\n' : ''}`,
     footer: `${customFooter ? '\\n' + customFooter : ''}\\n✅ Powered by PowerURLShortener.link`
   };
 }
