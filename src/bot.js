@@ -32,7 +32,7 @@ bot.setMyCommands([
   { command: 'api', description: 'Set your API token (/api YOUR_TOKEN)' },
   { command: 'add_header', description: 'Set custom header text' },
   { command: 'add_footer', description: 'Set custom footer text' },
-  { command: 'add', description: 'Guide: Add bot to your channel/group' }
+  
 ]);
 
 // --- Database File Setup
@@ -188,21 +188,6 @@ bot.onText(/\/add_footer (.+)/, (msg, match) => {
   bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
 });
 
-// /add command for help
-bot.onText(/\/add/, (msg) => {
-  const chatId = msg.chat.id;
-  const text = `➕ Hit 👉 /add command to get help about adding your channel to the bot.
-
-📌 How to add this bot to your Channel or Group:
-
-1️⃣ Add this bot as an **admin** to your Telegram **channel** or **group**.
-2️⃣ Give it permission to **Post Messages**.
-3️⃣ Once added, this bot will work the same way inside your channel or group — just send or forward links.
-
-ℹ️ If you need help, contact: @powerurlshortener`;
-
-  bot.sendMessage(chatId, text);
-});
 
 // --- Handle All Messages ---
 bot.on('message', async (msg) => {
