@@ -42,13 +42,36 @@ function getDatabaseData() {
 
 function saveUserToken(chatId, token) {
   const dbData = getDatabaseData();
-  dbData[chatId] = token;
+  if (!dbData[chatId]) dbData[chatId] = {};
+  dbData[chatId].token = token;
   fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
 }
 
 function getUserToken(chatId) {
   const dbData = getDatabaseData();
-  return dbData[chatId];
+  return dbData[chatId]?.token;
+}
+
+function saveUserHeader(chatId, header) {
+  const dbData = getDatabaseData();
+  if (!dbData[chatId]) dbData[chatId] = {};
+  dbData[chatId].header = header;
+  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+}
+
+function saveUserFooter(chatId, footer) {
+  const dbData = getDatabaseData();
+  if (!dbData[chatId]) dbData[chatId] = {};
+  dbData[chatId].footer = footer;
+  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+}
+
+function getUserHeaderFooter(chatId) {
+  const dbData = getDatabaseData();
+  return {
+    header: dbData[chatId]?.header || '🔗 Shortened Links:\n',
+    footer: dbData[chatId]?.footer || '\n✅ Powered by PowerURLShortener.link'
+  };
 }
 
 // --- URL Extract & Replace Functions
@@ -100,7 +123,7 @@ bot.onText(/\/start/, (msg) => {
   const lastName = msg.from.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
 
-  const welcomeMessage = `😇 Welcome Hello, ${fullName}!
+ const welcomeMessage = `😇 Welcome Hello, ${fullName}!
 
 
      🔗Welcome to the powerurlshortener.link URL Shortener Bot!\n'
@@ -114,7 +137,8 @@ bot.onText(/\/start/, (msg) => {
   ⚠️ You must have to send link with https:// or http://\n\n'
   Made with ❤️ By: https://t.me/powerurlshortener';
   **Now, go ahead and try it out!**';
-
+➕ Hit 👉 /add_footer To Get Help About Adding your Custom Footer to bot.
+➕ Hit 👉 /add_header To Get Help About Adding your Custom Footer to bot.
 🔥 Now send me any message or post containing links and I’ll shorten them for you!
 
 👨‍💻 Created by: https://t.me/namenainai`; 
@@ -137,12 +161,28 @@ bot.onText(/\/api (.+)/, (msg, match) => {
   bot.sendMessage(chatId, `✅ Your API token has been saved successfully.`);
 });
 
+// /add_header command
+bot.onText(/\/add_header (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const header = match[1].trim();
+  saveUserHeader(chatId, header);
+  bot.sendMessage(chatId, `✅ Your custom header has been saved.`);
+});
+
+// /add_footer command
+bot.onText(/\/add_footer (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const footer = match[1].trim();
+  saveUserFooter(chatId, footer);
+  bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
+});
+
 // --- Handle All Messages ---
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
   // Skip command messages
-  if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start'))) return;
+  if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start') || msg.text.startsWith('/sethf') || msg.text.startsWith('/add_header') || msg.text.startsWith('/add_footer'))) return;
 
   const isForwarded = msg.forward_from || msg.forward_from_chat;
 
@@ -153,8 +193,7 @@ bot.on('message', async (msg) => {
     const shortenedLinks = await shortenMultipleLinks(chatId, links);
     const updatedText = replaceLinksInText(text, links, shortenedLinks);
 
-    const header = '🔗 Shortened Links:\n';
-    const footer = '\n✅ Powered by PowerURLShortener.link';
+    const { header, footer } = getUserHeaderFooter(chatId);
     const finalText = header + updatedText + footer;
 
     if (msg.photo) {
