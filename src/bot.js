@@ -31,8 +31,7 @@ bot.setMyCommands([
   { command: 'start', description: 'Show welcome message' },
   { command: 'api', description: 'Set your API token (/api YOUR_TOKEN)' },
   { command: 'add_header', description: 'Set custom header text' },
-  { command: 'add_footer', description: 'Set custom footer text' },
-  
+  { command: 'add_footer', description: 'Set custom footer text' }
 ]);
 
 // --- Database File Setup
@@ -77,9 +76,12 @@ function saveUserFooter(chatId, footer) {
 
 function getUserHeaderFooter(chatId) {
   const dbData = getDatabaseData();
+  const customHeader = dbData[chatId]?.header || '';
+  const customFooter = dbData[chatId]?.footer || '';
+
   return {
-    header: dbData[chatId]?.header || '🔗 Shortened Links:\n',
-    footer: dbData[chatId]?.footer || '\n✅ Powered by PowerURLShortener.link'
+    header: `🔗 Shortened Links:\n${customHeader ? customHeader + '\n' : ''}`,
+    footer: `${customFooter ? '\n' + customFooter : ''}\n✅ Powered by PowerURLShortener.link`
   };
 }
 
@@ -134,25 +136,26 @@ bot.onText(/\/start/, (msg) => {
 
   const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!
 
-🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
+  🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
 
 
-     🔗Welcome to the powerurlshortener.link URL Shortener Bot!\n'
-    You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
-    To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
-    If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
-    How To Use Me 👇👇 \n\n powerurlshortener.link & Complete Your Registration.\n\n'
-  ✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. \n\n'
-  ✅3. Then add your API using command /api \n\n' 
-  Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
-  ⚠️ You must have to send link with https:// or http://\n\n'
-  Made with ❤️ By: https://t.me/powerurlshortener';
-  **Now, go ahead and try it out!**';
-➕ Hit 👉 /add_footer To Get Help About Adding your Custom Footer to bot.
-➕ Hit 👉 /add_header To Get Help About Adding your Custom Footer to bot.
-🔥 Now send me any message or post containing links and I’ll shorten them for you!
+       🔗Welcome to the powerurlshortener.link URL Shortener Bot!\n'
+      You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
+      To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
+      If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
+      How To Use Me 👇👇 \n\n powerurlshortener.link & Complete Your Registration.\n\n'
+    ✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. \n\n'
+    ✅3. Then add your API using command /api \n\n' 
+    Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
+    ⚠️ You must have to send link with https:// or http://\n\n'
+    Made with ❤️ By: https://t.me/powerurlshortener';
+    **Now, go ahead and try it out!**';
+  ➕ Hit 👉 /add_footer To Get Help About Adding your Custom Footer to bot.
+  ➕ Hit 👉 /add_header To Get Help About Adding your Custom Footer to bot.
+  🔥 Now send me any message or post containing links and I’ll shorten them for you!
 
-👨‍💻 Created by: https://t.me/namenainai`; 
+  👨‍💻 Created by: https://t.me/namenainai`; 
+
 
   bot.sendMessage(chatId, welcomeMessage);
 });
@@ -187,7 +190,6 @@ bot.onText(/\/add_footer (.+)/, (msg, match) => {
   saveUserFooter(chatId, footer);
   bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
 });
-
 
 // --- Handle All Messages ---
 bot.on('message', async (msg) => {
