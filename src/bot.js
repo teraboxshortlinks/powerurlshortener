@@ -203,33 +203,27 @@ bot.on('message', async (msg) => {
   const text = msg.text || msg.caption || '';
   const links = extractLinks(text);
 
-  if (links.length > 0) {
-    const shortenedLinks = await shortenMultipleLinks(chatId, links);
-    const updatedText = replaceLinksInText(text, links, shortenedLinks);
+ if (links.length > 0) {
+  const shortenedLinks = await shortenMultipleLinks(chatId, links);
+  const updatedText = replaceLinksInText(text, links, shortenedLinks);
 
-    const { header, footer } = getUserHeaderFooter(chatId);
-    const finalText = header + updatedText + footer;
+  const { header, footer } = getUserHeaderFooter(chatId);
+  const finalText = header + updatedText + footer;
 
-    if (msg.photo) {
-      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-      await bot.sendPhoto(chatId, photoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    } else {
-      await bot.sendMessage(chatId, finalText, { reply_to_message_id: msg.message_id });
-    }
-    return;
-  }
-
-  // If no links, just forward original
   if (msg.photo) {
     const photoFileId = msg.photo[msg.photo.length - 1].file_id;
     await bot.sendPhoto(chatId, photoFileId, {
-      caption: text,
+      caption: finalText,
       reply_to_message_id: msg.message_id
     });
-  } else if (msg.text) {
-    await bot.sendMessage(chatId, msg.text, { reply_to_message_id: msg.message_id });
+  } else if (msg.video) {
+    const videoFileId = msg.video.file_id;
+    await bot.sendVideo(chatId, videoFileId, {
+      caption: finalText,
+      reply_to_message_id: msg.message_id
+    });
+  } else {
+    await bot.sendMessage(chatId, finalText, { reply_to_message_id: msg.message_id });
   }
-});
+  return;
+}
