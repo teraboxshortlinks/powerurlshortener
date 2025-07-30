@@ -255,3 +255,62 @@ bot.on('message', async (msg) => {
     });
   }
 });
+// অটো চ্যানেল বা গ্রুপে পোস্ট
+const targetChannel = getUserChannel(chatId);
+if (targetChannel) {
+  try {
+    await bot.sendMessage(targetChannel, finalText);
+  } catch (err) {
+    console.error(`❌ চ্যানেল/গ্রুপে সেন্ড করতে সমস্যা: ${err.message}`);
+    bot.sendMessage(chatId, '⚠️ চ্যানেলে/গ্রুপে মেসেজ পাঠানো যায়নি। বটকে অ্যাডমিন দিয়েছেন কি না চেক করুন।');
+  }
+}
+function saveUserChannel(chatId, channelId) {
+  const dbData = getDatabaseData();
+  if (!dbData[chatId]) dbData[chatId] = {};
+  dbData[chatId].channel = channelId;
+  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+}
+
+function getUserChannel(chatId) {
+  const dbData = getDatabaseData();
+  return dbData[chatId]?.channel;
+}
+
+function removeUserChannel(chatId) {
+  const dbData = getDatabaseData();
+  if (dbData[chatId] && dbData[chatId].channel) {
+    delete dbData[chatId].channel;
+    fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+    return true;
+  }
+  return false;
+}
+bot.onText(/\/set_channel (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const channelId = match[1].trim(); // যেমন @mychannel বা -100xxxxxxxxxx
+
+  saveUserChannel(chatId, channelId);
+  bot.sendMessage(chatId, `✅ আপনার চ্যানেল/গ্রুপ সেট করা হয়েছে: ${channelId}\n
+⚠️ নিশ্চিত হন যে আপনি বটকে আপনার চ্যানেল বা গ্রুপে অ্যাড করে অ্যাডমিন দিয়েছেন।`);
+});
+bot.onText(/\/remove_channel/, (msg) => {
+  const chatId = msg.chat.id;
+  const removed = removeUserChannel(chatId);
+
+  if (removed) {
+    bot.sendMessage(chatId, '✅ আপনার সেট করা চ্যানেল সফলভাবে মুছে ফেলা হয়েছে।');
+  } else {
+    bot.sendMessage(chatId, 'ℹ️ কোনো চ্যানেল সেট করা ছিল না।');
+  }
+});
+bot.onText(/\/my_channel/, (msg) => {
+  const chatId = msg.chat.id;
+  const channelId = getUserChannel(chatId);
+
+  if (channelId) {
+    bot.sendMessage(chatId, `📢 আপনার সেট করা চ্যানেল/গ্রুপ:\n${channelId}`);
+  } else {
+    bot.sendMessage(chatId, `ℹ️ আপনি এখনো কোনো চ্যানেল সেট করেননি।\n/set_channel @yourchannel এই কমান্ড ব্যবহার করুন।`);
+  }
+});
