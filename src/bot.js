@@ -2,8 +2,10 @@ const TelegramBot = require('node-telegram-bot-api');
 const axios = require('axios');
 const fs = require('fs');
 const express = require('express');
+const path = require('path');
 const app = express();
 
+// --- Express server (for uptime check)
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
@@ -13,91 +15,47 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
-// Retrieve the Telegram bot token from the environment variable
+// --- Telegram Bot Token from Environment Variable
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-// Create the Telegram bot instance
-const bot = new TelegramBot(botToken, { polling: true });
-
-// Handle /start command
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  const username = msg.from.username;
-  const welcomeMessage = `😇 Hello, ${username}!\n\n`
-    + 'Welcome to the powerurlshortener.link URL Shortener Bot!\n'
-    + 'You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
-    + 'To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
-    + 'If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
-    + 'How To Use Me 👇👇 \n\n powerurlshortener.link & Complete Your Registration.\n\n'
-  + '✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. \n\n'
-  + '✅3. Then add your API using command /api \n\n' 
-  + 'Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
-  + '⚠️ You must have to send link with https:// or http://\n\n'
-  + 'Made with ❤️ By: https://t.me/powerurlshortener';
-  + '**Now, go ahead and try it out!**';
-
-  bot.sendMessage(chatId, welcomeMessage);
-});
-
-// Command: /api
-bot.onText(/\/api (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const userToken = match[1].trim();
-
-  // Save the user's powerurlshortener API token to the database
-  saveUserToken(chatId, userToken);
-
-  const response = `Your powerurlshortener API token set successfully. ✅️✅️ Your token is: ${userToken}`;
-  bot.sendMessage(chatId, response);
-});
-
-// Listen for any message (not just commands)
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-
-  // Check if message contains text or forwarded content
-  if (msg.text || msg.caption) {
-    const text = msg.text || msg.caption;
-    const links = extractLinks(text);
-
-    if (links.length > 0) {
-      const shortenedLinks = await shortenMultipleLinks(chatId, links);
-
-      // Replace original links in the text
-      const updatedText = replaceLinksInText(text, links, shortenedLinks);
-
-      bot.sendMessage(chatId, updatedText, {
-        reply_to_message_id: msg.message_id,
-      });
-    }
-  }
-
-  // If message has media with caption, handle it
-  if (msg.photo || msg.video || msg.document) {
-    const caption = msg.caption || '';
-    const links = extractLinks(caption);
-
-    if (links.length > 0) {
-      const shortenedLinks = await shortenMultipleLinks(chatId, links);
-
-      // Replace original links in the caption
-      const updatedCaption = replaceLinksInText(caption, links, shortenedLinks);
-
-      bot.sendMessage(chatId, updatedCaption, {
-        reply_to_message_id: msg.message_id,
-      });
-    }
-  }
-});
-
-// Function to extract URLs from a given text
-function extractLinks(text) {
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+|[a-zA-Z0-9-]+\.[a-zA-Z]{2,})([^\s]*)/g;
-  const links = [...text.matchAll(urlRegex)].map(match => match[0]);
-  return links;
+if (!botToken) {
+  console.error('Error: TELEGRAM_BOT_TOKEN environment variable not set');
+  process.exit(1);
 }
 
-// Function to replace original links with shortened links in the text
+// --- Telegram Bot Instance
+const bot = new TelegramBot(botToken, { polling: true });
+
+// --- Database File Setup
+const dbPath = path.join(__dirname, 'src', 'database.json');
+if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath));
+if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '{}');
+
+// --- Database Functions
+function getDatabaseData() {
+  try {
+    return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+  } catch (error) {
+    return {};
+  }
+}
+
+function saveUserToken(chatId, token) {
+  const dbData = getDatabaseData();
+  dbData[chatId] = token;
+  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+}
+
+function getUserToken(chatId) {
+  const dbData = getDatabaseData();
+  return dbData[chatId];
+}
+
+// --- URL Extract & Replace Functions
+function extractLinks(text) {
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+  return [...text.matchAll(urlRegex)].map(match => match[0]);
+}
+
 function replaceLinksInText(text, originalLinks, shortenedLinks) {
   let updatedText = text;
   originalLinks.forEach((link, index) => {
@@ -106,53 +64,124 @@ function replaceLinksInText(text, originalLinks, shortenedLinks) {
   return updatedText;
 }
 
-// Function to shorten multiple links
+// --- URL Shortener
+async function shortenUrl(chatId, url) {
+  const userToken = getUserToken(chatId);
+  if (!userToken) {
+    bot.sendMessage(chatId, '⚠️ Please set your powerurlshortener.link API token first:\n/api YOUR_TOKEN');
+    return null;
+  }
+  try {
+    const apiUrl = `https://powerurlshortener.link/api?api=${userToken}&url=${encodeURIComponent(url)}`;
+    const response = await axios.get(apiUrl);
+    return response.data.shortenedUrl || response.data.shortened || response.data.short || url;
+  } catch (error) {
+    console.error('Shorten URL Error:', error.message);
+    return url;
+  }
+}
+
 async function shortenMultipleLinks(chatId, links) {
   const shortenedLinks = [];
   for (const link of links) {
-    const shortenedLink = await shortenUrl(chatId, link);
-    shortenedLinks.push(shortenedLink || link); // Use original link if shortening fails
+    const shortened = await shortenUrl(chatId, link);
+    shortenedLinks.push(shortened || link);
   }
   return shortenedLinks;
 }
 
-// Function to shorten a single URL
-async function shortenUrl(chatId, url) {
-  const adlinkflyToken = getUserToken(chatId);
+// --- Telegram Bot Handlers ---
+// /start command
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const username = msg.from.username || 'User';
 
-  if (!adlinkflyToken) {
-    bot.sendMessage(chatId, 'Please set up your powerurlshortener.link API token first. Use the command: /api YOUR_powerurlshortener_API_TOKEN');
-    return null;
+  const welcomeMessage = `😇 Hello, ${username}!\n\n`
+    + 'Welcome to the powerurlshortener.link URL Shortener Bot!\n\n'
+    + 'This bot allows you to shorten URLs easily.\n'
+    + 'If you haven\'t set your API token yet, use:\n/api YOUR_API_TOKEN\n\n'
+    + 'How to use:\n'
+    + '1. Register at powerurlshortener.link\n'
+    + '2. Copy your API key from: https://powerurlshortener.link/member/tools/api\n'
+    + '3. Use the command: /api YOUR_API_TOKEN\n\n'
+    + '⚠️ Make sure links start with https:// or http://\n\n'
+    + 'Made with ❤️ By: https://t.me/powerurlshortener\n'
+    + '**Now, try it out!**';
+
+  bot.sendMessage(chatId, welcomeMessage);
+});
+
+// /api command
+bot.onText(/\/api (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const userToken = match[1].trim();
+
+  saveUserToken(chatId, userToken);
+  bot.sendMessage(chatId, `✅ Your API token has been set successfully:\n${userToken}`);
+});
+
+// --- Handle All Messages ---
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+
+  // Skip command messages
+  if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start'))) return;
+
+  const isForwarded = msg.forward_from || msg.forward_from_chat;
+
+  // --- Case 1: Forwarded Photo + Caption ---
+  if (isForwarded && msg.photo) {
+    const caption = msg.caption || '';
+    const links = extractLinks(caption);
+
+    if (links.length > 0) {
+      const shortenedLinks = await shortenMultipleLinks(chatId, links);
+      const updatedCaption = replaceLinksInText(caption, links, shortenedLinks);
+
+      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+      await bot.sendPhoto(chatId, photoFileId, {
+        caption: updatedCaption,
+        reply_to_message_id: msg.message_id
+      });
+    } else {
+      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+      await bot.sendPhoto(chatId, photoFileId, {
+        caption: caption,
+        reply_to_message_id: msg.message_id
+      });
+    }
+    return;
   }
 
-  try {
-    const apiUrl = `https://powerurlshortener.link/api?api=${adlinkflyToken}&url=${encodeURIComponent(url)}`;
-    const response = await axios.get(apiUrl);
-    return response.data.shortenedUrl;
-  } catch (error) {
-    console.error('Shorten URL Error:', error);
-    return null;
+  // --- Case 2: Forwarded Text only ---
+  if (isForwarded && msg.text) {
+    const links = extractLinks(msg.text);
+    if (links.length > 0) {
+      const shortenedLinks = await shortenMultipleLinks(chatId, links);
+      const updatedText = replaceLinksInText(msg.text, links, shortenedLinks);
+      await bot.sendMessage(chatId, updatedText, { reply_to_message_id: msg.message_id });
+    } else {
+      await bot.sendMessage(chatId, msg.text, { reply_to_message_id: msg.message_id });
+    }
+    return;
   }
-}
 
-// Function to save user's powerurlshortener API token
-function saveUserToken(chatId, token) {
-  const dbData = getDatabaseData();
-  dbData[chatId] = token;
-  fs.writeFileSync('./src/database.json', JSON.stringify(dbData, null, 2));
-}
+  // --- Case 3: Normal Message (Text + Photo) ---
+  const text = msg.text || msg.caption || '';
+  const links = extractLinks(text);
 
-// Function to retrieve user's powerurlshortener API token
-function getUserToken(chatId) {
-  const dbData = getDatabaseData();
-  return dbData[chatId];
-}
+  if (links.length > 0) {
+    const shortenedLinks = await shortenMultipleLinks(chatId, links);
+    const updatedText = replaceLinksInText(text, links, shortenedLinks);
 
-// Function to read the database file
-function getDatabaseData() {
-  try {
-    return JSON.parse(fs.readFileSync('./src/database.json', 'utf8'));
-  } catch (error) {
-    return {};
+    if (msg.photo) {
+      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+      await bot.sendPhoto(chatId, photoFileId, {
+        caption: updatedText,
+        reply_to_message_id: msg.message_id
+      });
+    } else {
+      await bot.sendMessage(chatId, updatedText, { reply_to_message_id: msg.message_id });
+    }
   }
-}
+});
