@@ -6,14 +6,14 @@ const express = require('express');
 const path = require('path');
 const app = express();
 
-// --- Express server (for uptime check)
 app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 const port = 8080;
-app.listen(port, () => console.log(`Server running at http://localhost:${port}`));
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
 
-// --- Telegram Bot Token from Environment Variable
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!botToken) {
   console.error('Error: TELEGRAM_BOT_TOKEN not set');
@@ -21,19 +21,18 @@ if (!botToken) {
 }
 const bot = new TelegramBot(botToken, { polling: true });
 
-// --- Commands
 bot.setMyCommands([
   { command: 'start', description: 'Show welcome message' },
   { command: 'api', description: 'Set your API token (/api YOUR_TOKEN)' },
   { command: 'add_header', description: 'Set custom header text' },
   { command: 'add_footer', description: 'Set custom footer text' },
-  { command: 'set_channel', description: 'Set sent link channel' },
+  { command: 'set_channel', description: 'Set auto-post channel' },
   { command: 'remove_channel', description: 'Remove channel' },
   { command: 'balance', description: 'My balance' },
   { command: 'my_channel', description: 'My channel' }
 ]);
 
-// --- Database
+// DB
 const dbPath = path.join(__dirname, 'src', 'database.json');
 if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath));
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '{}');
@@ -65,28 +64,29 @@ function deleteFromDatabase(chatId, key) {
   return false;
 }
 
-// --- Header/Footer
+// Header/Footer
 function getUserHeaderFooter(chatId) {
   const header = getFromDatabase(chatId, 'header') || '';
   const footer = getFromDatabase(chatId, 'footer') || '';
   return {
-    header: header ? `🔗 Links:\n${header}\n` : '',
-    footer: `\n${footer || ''}\n✅ Powered by PowerURLShortener.link`
+    header: `${header ? header + '\n' : ''}`,
+    footer: `${footer ? '\n' + footer : ''}\n✅ Powered by PowerURLShortener.link`
   };
 }
 
-// --- Link Handling
 function extractLinks(text) {
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
   return [...text.matchAll(urlRegex)].map(match => match[0]);
 }
-function replaceLinks(text, original, shortened) {
-  let updated = text;
-  original.forEach((link, idx) => {
-    updated = updated.replace(link, shortened[idx]);
+
+function replaceLinksInText(text, originalLinks, shortenedLinks) {
+  let updatedText = text;
+  originalLinks.forEach((link, index) => {
+    updatedText = updatedText.replace(link, shortenedLinks[index]);
   });
-  return updated;
+  return updatedText;
 }
+
 async function shortenUrl(chatId, url) {
   const token = getFromDatabase(chatId, 'token');
   if (!token) {
@@ -94,58 +94,65 @@ async function shortenUrl(chatId, url) {
     return null;
   }
   try {
-    const apiUrl = `https://powerurlshortener.link/api?api=${token}&url=${encodeURIComponent(url)}`;
-    const res = await axios.get(apiUrl);
+    const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&url=${encodeURIComponent(url)}`);
     return res.data.shortenedUrl || res.data.shortened || res.data.short || url;
   } catch (err) {
-    console.error('Shorten URL Error:', err.message);
     return url;
   }
 }
+
 async function shortenMultipleLinks(chatId, links) {
-  const results = [];
+  const result = [];
   for (const link of links) {
     const short = await shortenUrl(chatId, link);
-    results.push(short || link);
+    result.push(short || link);
   }
-  return results;
+  return result;
 }
 
-// --- Commands
 bot.onText(/\/start/, (msg) => {
   const name = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim();
-  const welcome = `😇 Welcome Hello Dear, ${name}!
+  const text = `😇 *Welcome, ${name}!*
 
-🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
+🔗 *PowerURLShortener Bot* helps you shorten any valid URL easily using the [powerurlshortener.link](https://powerurlshortener.link) API service.
 
-To shorten a URL, just type or paste the URL directly.
+To shorten a URL, just send it directly in the chat — the bot will return a shortened version.
 
-If you haven't set your API token yet:
-/api YOUR_powerurlshortener_API_TOKEN
+---
 
-📌 How To Use:
-1. Go to powerurlshortener.link & register.
-2. Copy your API Key from:
-   https://powerurlshortener.link/member/tools/api
-3. Set API: /api <your_api>
+📌 *How to Use Me:*
+1. Register at [powerurlshortener.link](https://powerurlshortener.link)
+2. Get your API key from:
+   👉 https://powerurlshortener.link/member/tools/api
+3. Set it using: \`/api <your_api>\`
 
-✅ Example:
-   /api f80e3447043b...
+✅ *Example:*
+\`/api f80e3447043b391084f992de73eb5970e70b0b79\`
 
-🧩 Commands:
-➕ /api — Set your API token
-➕ /add_header — Add a custom header
-➕ /add_footer — Add a custom footer
-➕ /balance — Check your balance
-➕ /set_channel — Set auto-post channel
+⚠️ *Links must start with* \`http://\` or \`https://\`
 
-🔗 Made with ❤️ by: https://t.me/powerurlshortener`;
-  bot.sendMessage(msg.chat.id, welcome);
+---
+
+🧩 *Commands:*
+➕ \`/api\` — Set your API token  
+➕ \`/add_header\` — Add custom header  
+➕ \`/add_footer\` — Add custom footer  
+➕ \`/balance\` — Check your balance  
+➕ \`/set_channel\` — Set auto-post channel
+
+---
+
+🔗 *Made with ❤️ by:* [PowerURLShortener](https://t.me/powerurlshortener)  
+👨‍💻 *Created by:* [@namenainai](https://t.me/namenainai)`;
+
+ 
+
+  bot.sendMessage(msg.chat.id, text);
 });
 
 bot.onText(/\/api (.+)/, (msg, match) => {
   saveToDatabase(msg.chat.id, 'token', match[1].trim());
-  bot.sendMessage(msg.chat.id, '✅ Your API token has been saved.');
+  bot.sendMessage(msg.chat.id, '✅ API token saved.');
 });
 bot.onText(/\/add_header (.+)/, (msg, match) => {
   saveToDatabase(msg.chat.id, 'header', match[1].trim());
@@ -165,43 +172,37 @@ bot.onText(/\/remove_channel/, (msg) => {
 });
 bot.onText(/\/my_channel/, (msg) => {
   const channel = getFromDatabase(msg.chat.id, 'channel');
-  bot.sendMessage(msg.chat.id, channel ? `📢 Current channel: ${channel}` : 'No channel set.\nUse /set_channel @yourchannel');
+  bot.sendMessage(msg.chat.id, channel ? `📢 Your channel: ${channel}` : 'No channel set.');
 });
 bot.onText(/\/balance/, async (msg) => {
-  const chatId = msg.chat.id;
-  const token = getFromDatabase(chatId, 'token');
-  if (!token) return bot.sendMessage(chatId, '⚠️ Please set your API token first with /api YOUR_TOKEN');
-
+  const token = getFromDatabase(msg.chat.id, 'token');
+  if (!token) return bot.sendMessage(msg.chat.id, '⚠️ Set API first: /api YOUR_TOKEN');
   try {
     const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&action=userinfo`);
-    const d = res.data;
-    if (d.status === 'success') {
-      const text = `💰 *Your Balance Info*\n\n` +
-        `🔹 Balance: $${d.balance || 'N/A'}\n` +
-        `👁️ Clicks: *${d.clicks || 'N/A'}*\n` +
-        `📄 Shortened URLs: *${d.shortened_urls || 'N/A'}*`;
-      bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    if (res.data.status === 'success') {
+      bot.sendMessage(msg.chat.id, `💰 Balance: $${res.data.balance}\n👁️ Clicks: ${res.data.clicks}`);
     } else {
-      bot.sendMessage(chatId, '❌ Invalid API token or failed to fetch.');
+      bot.sendMessage(msg.chat.id, '❌ Invalid API token.');
     }
-  } catch (err) {
-    bot.sendMessage(chatId, '🚫 Error fetching balance. Try later.');
+  } catch {
+    bot.sendMessage(msg.chat.id, '🚫 Failed to fetch balance.');
   }
 });
 
-// --- Media Group Handling
+// MediaGroup handler
 const mediaGroups = {};
-
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
   if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start'))) return;
 
-  const isForwarded = msg.forward_from || msg.forward_from_chat;
   const { header, footer } = getUserHeaderFooter(chatId);
+  const isForwarded = msg.forward_from || msg.forward_from_chat;
+  const channel = getFromDatabase(chatId, 'channel');
 
-  // Media Group
+  // Handle Media Group
   if (msg.media_group_id) {
     const groupId = msg.media_group_id;
+
     if (!mediaGroups[groupId]) {
       mediaGroups[groupId] = [];
       setTimeout(async () => {
@@ -212,72 +213,86 @@ bot.on('message', async (msg) => {
         const caption = group.find(m => m.caption)?.caption || '';
         const links = extractLinks(caption);
         let updatedCaption = caption;
+
         if (links.length > 0) {
           const shortened = await shortenMultipleLinks(chatId, links);
-          updatedCaption = replaceLinks(caption, links, shortened);
+          updatedCaption = replaceLinksInText(caption, shortened);
         }
+
         const finalCaption = `${header}${updatedCaption}${footer}`;
         const media = group.map((m, i) => {
           if (m.photo) {
-            const fileId = m.photo[m.photo.length - 1].file_id;
-            return { type: 'photo', media: fileId, caption: i === 0 ? finalCaption : undefined };
+            return {
+              type: 'photo',
+              media: m.photo[m.photo.length - 1].file_id,
+              caption: i === 0 ? finalCaption : undefined
+            };
           } else if (m.video) {
-            return { type: 'video', media: m.video.file_id, caption: i === 0 ? finalCaption : undefined };
+            return {
+              type: 'video',
+              media: m.video.file_id,
+              caption: i === 0 ? finalCaption : undefined
+            };
           }
         });
+
         await bot.sendMediaGroup(chatId, media, { reply_to_message_id: group[0].message_id });
+        if (channel) {
+          await bot.sendMediaGroup(channel, media);
+        }
       }, 500);
     }
+
     mediaGroups[groupId].push(msg);
     return;
   }
 
-  // Forwarded Photo
+  // Handle forwarded photo
   if (isForwarded && msg.photo) {
     const caption = msg.caption || '';
     const links = extractLinks(caption);
     const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = replaceLinks(caption, links, shortened);
+    const updated = replaceLinksInText(caption, links, shortened);
     const finalCaption = `${header}${updated}${footer}`;
-    return bot.sendPhoto(chatId, msg.photo[msg.photo.length - 1].file_id, {
-      caption: finalCaption,
-      reply_to_message_id: msg.message_id
-    });
+    const photoId = msg.photo[msg.photo.length - 1].file_id;
+
+    await bot.sendPhoto(chatId, photoId, { caption: finalCaption, reply_to_message_id: msg.message_id });
+    if (channel) await bot.sendPhoto(channel, photoId, { caption: finalCaption });
+    return;
   }
 
-  // Forwarded Video
+  // Handle forwarded video
   if (isForwarded && msg.video) {
     const caption = msg.caption || '';
     const links = extractLinks(caption);
     const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = replaceLinks(caption, links, shortened);
+    const updated = replaceLinksInText(caption, links, shortened);
     const finalCaption = `${header}${updated}${footer}`;
-    return bot.sendVideo(chatId, msg.video.file_id, {
-      caption: finalCaption,
-      reply_to_message_id: msg.message_id
-    });
+
+    await bot.sendVideo(chatId, msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id });
+    if (channel) await bot.sendVideo(channel, msg.video.file_id, { caption: finalCaption });
+    return;
   }
 
-  // Normal message/photo/video
-  const text = msg.text || msg.caption || '';
-  const links = extractLinks(text);
+  // Normal message / photo / video
+  const content = msg.text || msg.caption || '';
+  const links = extractLinks(content);
+
   if (links.length > 0) {
     const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = replaceLinks(text, links, shortened);
+    const updated = replaceLinksInText(content, links, shortened);
     const finalCaption = `${header}${updated}${footer}`;
 
     if (msg.photo) {
-      return bot.sendPhoto(chatId, msg.photo[msg.photo.length - 1].file_id, {
-        caption: finalCaption,
-        reply_to_message_id: msg.message_id
-      });
+      const photoId = msg.photo[msg.photo.length - 1].file_id;
+      await bot.sendPhoto(chatId, photoId, { caption: finalCaption, reply_to_message_id: msg.message_id });
+      if (channel) await bot.sendPhoto(channel, photoId, { caption: finalCaption });
+    } else if (msg.video) {
+      await bot.sendVideo(chatId, msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id });
+      if (channel) await bot.sendVideo(channel, msg.video.file_id, { caption: finalCaption });
+    } else {
+      await bot.sendMessage(chatId, finalCaption, { reply_to_message_id: msg.message_id });
+      if (channel) await bot.sendMessage(channel, finalCaption);
     }
-    if (msg.video) {
-      return bot.sendVideo(chatId, msg.video.file_id, {
-        caption: finalCaption,
-        reply_to_message_id: msg.message_id
-      });
-    }
-    return bot.sendMessage(chatId, finalCaption, { reply_to_message_id: msg.message_id });
   }
 });
