@@ -223,7 +223,7 @@ Now, go ahead and try it out!**';
   }
 
   saveUserToken(chatId, newToken);
-  bot.sendMessage(chatId, `✅ Your API token has been saved successfully.`);
+  bot.sendMessage(chatId, "✅ Your API token has been saved successfully.");
 });
 
 bot.onText(/\/add_header (.+)/, (msg, match) => {
