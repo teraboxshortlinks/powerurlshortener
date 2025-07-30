@@ -34,13 +34,14 @@ bot.setMyCommands([
 
 // DB
 const dbPath = path.join(__dirname, 'src', 'database.json');
-if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath));
+if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath), { recursive: true }); // Ensure recursive creation
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '{}');
 
 function getDatabaseData() {
   try {
     return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-  } catch {
+  } catch (error) {
+    console.error('Error reading database:', error.message);
     return {};
   }
 }
@@ -69,8 +70,8 @@ function getUserHeaderFooter(chatId) {
   const header = getFromDatabase(chatId, 'header') || '';
   const footer = getFromDatabase(chatId, 'footer') || '';
   return {
-    header: `${header ? header + '\n' : ''}`,
-    footer: `${footer ? '\n' + footer : ''}\n✅ Powered by PowerURLShortener.link`
+    header: `${header ? header + '\n\n🔗 Links:\n\n' : ''}`,
+    footer: `${footer ? '\n' + footer : ''}\n\n✅ Powered by PowerURLShortener.link`
   };
 }
 
@@ -79,25 +80,30 @@ function extractLinks(text) {
   return [...text.matchAll(urlRegex)].map(match => match[0]);
 }
 
-function replaceLinksInText(text, originalLinks, shortenedLinks) {
-  let updatedText = text;
-  originalLinks.forEach((link, index) => {
-    updatedText = updatedText.replace(link, shortenedLinks[index]);
+// This function now correctly takes 'links' and 'shortenedLinks' to replace them
+async function replaceLinksInText(originalText, links, shortenedLinks) {
+  let replacedText = originalText;
+  links.forEach((link, index) => {
+    // Only replace if a shortened URL exists for that index
+    if (shortenedLinks[index]) {
+      replacedText = replacedText.replace(link, shortenedLinks[index]);
+    }
   });
-  return updatedText;
+  return replacedText;
 }
 
 async function shortenUrl(chatId, url) {
   const token = getFromDatabase(chatId, 'token');
   if (!token) {
-    bot.sendMessage(chatId, '⚠️ Please set your API token using:\n/api YOUR_API_TOKEN');
+    // No need to send message here, it's handled by the main message logic
     return null;
   }
   try {
     const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&url=${encodeURIComponent(url)}`);
     return res.data.shortenedUrl || res.data.shortened || res.data.short || url;
   } catch (err) {
-    return url;
+    console.error(`Error shortening URL ${url} for chat ${chatId}:`, err.message);
+    return url; // Return original URL on error
   }
 }
 
@@ -105,12 +111,53 @@ async function shortenMultipleLinks(chatId, links) {
   const result = [];
   for (const link of links) {
     const short = await shortenUrl(chatId, link);
-    result.push(short || link);
+    result.push(short || link); // Ensure we always push something
   }
   return result;
 }
 
-bot.onText(/\/start/, (msg) => {
+// Generic function to send message with robust error handling
+async function sendTelegramMessage(chatId, type, content, options = {}) {
+    try {
+        if (!chatId) {
+            console.warn(`Attempted to send message to undefined/null chatId. Type: ${type}, Content: ${JSON.stringify(content).substring(0, 100)}...`);
+            return;
+        }
+
+        switch (type) {
+            case 'text':
+                await bot.sendMessage(chatId, content, options);
+                break;
+            case 'photo':
+                await bot.sendPhoto(chatId, content, options);
+                break;
+            case 'video':
+                await bot.sendVideo(chatId, content, options);
+                break;
+            case 'mediaGroup':
+                await bot.sendMediaGroup(chatId, content, options);
+                break;
+            default:
+                console.warn(`Unknown message type: ${type}`);
+                break;
+        }
+        // console.log(`Successfully sent ${type} to chat ${chatId}`);
+    } catch (error) {
+        console.error(`Failed to send ${type} to chat ID ${chatId}:`, error.message);
+        if (error.response && error.response.statusCode === 400 && error.response.body && error.response.body.description.includes('chat not found')) {
+            console.warn(`Error details: Chat ID ${chatId} not found. This might be due to incorrect channel ID or the bot being blocked.`);
+            // Inform the user if it's their personal chat and the error occurred
+            if (options.isUserChat) { // Custom option to identify user's personal chat
+                 await bot.sendMessage(chatId, "⚠️ Sorry! I couldn't send the message to the specified chat/channel. Please ensure the ID is correct and I have the necessary permissions.", { parse_mode: 'Markdown' });
+            }
+        } else {
+            console.error(`An unexpected error occurred while sending ${type} to chat ${chatId}:`, error);
+        }
+    }
+}
+
+
+bot.onText(/\/start/, async (msg) => {
   const name = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim();
   const text = `😇 *Welcome, ${name}!*
 
@@ -134,58 +181,65 @@ To shorten a URL, just send it directly in the chat — the bot will return a sh
 ---
 
 🧩 *Commands:*
-➕ \`/api\` — Set your API token  
-➕ \`/add_header\` — Add custom header  
-➕ \`/add_footer\` — Add custom footer  
-➕ \`/balance\` — Check your balance  
+➕ \`/api\` — Set your API token
+➕ \`/add_header\` — Add custom header
+➕ \`/add_footer\` — Add custom footer
+➕ \`/balance\` — Check your balance
 ➕ \`/set_channel\` — Set auto-post channel
 
 ---
 
-🔗 *Made with ❤️ by:* [PowerURLShortener](https://t.me/powerurlshortener)  
+🔗 *Made with ❤️ by:* [PowerURLShortener](https://t.me/powerurlshortener)
 👨‍💻 *Created by:* [@namenainai](https://t.me/namenainai)`;
 
- 
-
-  bot.sendMessage(msg.chat.id, text);
+  await sendTelegramMessage(msg.chat.id, 'text', text, { parse_mode: 'Markdown', isUserChat: true });
 });
 
-bot.onText(/\/api (.+)/, (msg, match) => {
+bot.onText(/\/api (.+)/, async (msg, match) => {
   saveToDatabase(msg.chat.id, 'token', match[1].trim());
-  bot.sendMessage(msg.chat.id, '✅ API token saved.');
+  await sendTelegramMessage(msg.chat.id, 'text', '✅ API token saved.', { isUserChat: true });
 });
-bot.onText(/\/add_header (.+)/, (msg, match) => {
+
+bot.onText(/\/add_header (.+)/, async (msg, match) => {
   saveToDatabase(msg.chat.id, 'header', match[1].trim());
-  bot.sendMessage(msg.chat.id, '✅ Header saved.');
+  await sendTelegramMessage(msg.chat.id, 'text', '✅ Header saved.', { isUserChat: true });
 });
-bot.onText(/\/add_footer (.+)/, (msg, match) => {
+
+bot.onText(/\/add_footer (.+)/, async (msg, match) => {
   saveToDatabase(msg.chat.id, 'footer', match[1].trim());
-  bot.sendMessage(msg.chat.id, '✅ Footer saved.');
+  await sendTelegramMessage(msg.chat.id, 'text', '✅ Footer saved.', { isUserChat: true });
 });
-bot.onText(/\/set_channel (.+)/, (msg, match) => {
-  saveToDatabase(msg.chat.id, 'channel', match[1].trim());
-  bot.sendMessage(msg.chat.id, '✅ Channel set.');
+
+bot.onText(/\/set_channel (.+)/, async (msg, match) => {
+  const channelId = match[1].trim();
+  saveToDatabase(msg.chat.id, 'channel', channelId);
+  await sendTelegramMessage(msg.chat.id, 'text', `✅ Channel set: \`${channelId}\`. Please ensure I am an admin in this channel.`, { parse_mode: 'Markdown', isUserChat: true });
 });
-bot.onText(/\/remove_channel/, (msg) => {
+
+bot.onText(/\/remove_channel/, async (msg) => {
   const removed = deleteFromDatabase(msg.chat.id, 'channel');
-  bot.sendMessage(msg.chat.id, removed ? '✅ Channel removed.' : 'ℹ️ No channel was set.');
+  await sendTelegramMessage(msg.chat.id, 'text', removed ? '✅ Channel removed.' : 'ℹ️ No channel was set.', { isUserChat: true });
 });
-bot.onText(/\/my_channel/, (msg) => {
+
+bot.onText(/\/my_channel/, async (msg) => {
   const channel = getFromDatabase(msg.chat.id, 'channel');
-  bot.sendMessage(msg.chat.id, channel ? `📢 Your channel: ${channel}` : 'No channel set.');
+  await sendTelegramMessage(msg.chat.id, 'text', channel ? `📢 Your channel: \`${channel}\`` : 'No channel set.', { parse_mode: 'Markdown', isUserChat: true });
 });
+
 bot.onText(/\/balance/, async (msg) => {
   const token = getFromDatabase(msg.chat.id, 'token');
-  if (!token) return bot.sendMessage(msg.chat.id, '⚠️ Set API first: /api YOUR_TOKEN');
+  if (!token) return await sendTelegramMessage(msg.chat.id, 'text', '⚠️ First set API: /api YOUR_TOKEN', { isUserChat: true });
+
   try {
     const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&action=userinfo`);
     if (res.data.status === 'success') {
-      bot.sendMessage(msg.chat.id, `💰 Balance: $${res.data.balance}\n👁️ Clicks: ${res.data.clicks}`);
+      await sendTelegramMessage(msg.chat.id, 'text', `💰 Balance: $${res.data.balance}\n👁️ Clicks: ${res.data.clicks}`, { isUserChat: true });
     } else {
-      bot.sendMessage(msg.chat.id, '❌ Invalid API token.');
+      await sendTelegramMessage(msg.chat.id, 'text', '❌ Invalid API token.', { isUserChat: true });
     }
-  } catch {
-    bot.sendMessage(msg.chat.id, '🚫 Failed to fetch balance.');
+  } catch (error) {
+    console.error(`Failed to fetch balance for chat ${msg.chat.id}:`, error.message);
+    await sendTelegramMessage(msg.chat.id, 'text', '🚫 Failed to fetch balance.', { isUserChat: true });
   }
 });
 
@@ -193,11 +247,20 @@ bot.onText(/\/balance/, async (msg) => {
 const mediaGroups = {};
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start'))) return;
+  // Ignore commands
+  if (msg.text && (msg.text.startsWith('/') && msg.text.length > 1 && !msg.text.includes(' '))) return;
 
   const { header, footer } = getUserHeaderFooter(chatId);
   const isForwarded = msg.forward_from || msg.forward_from_chat;
   const channel = getFromDatabase(chatId, 'channel');
+  const userApiToken = getFromDatabase(chatId, 'token');
+
+  // If no API token is set, inform the user and stop processing
+  if (!userApiToken && !msg.text.startsWith('/api')) { // Allow /api command to set token
+    await sendTelegramMessage(chatId, 'text', '⚠️ Your API token is not set. Please set it using `/api YOUR_API_TOKEN`.', { isUserChat: true });
+    return;
+  }
+
 
   // Handle Media Group
   if (msg.media_group_id) {
@@ -216,33 +279,29 @@ bot.on('message', async (msg) => {
 
         if (links.length > 0) {
           const shortened = await shortenMultipleLinks(chatId, links);
-          updatedCaption = replaceLinksInText(caption, shortened);
+          updatedCaption = await replaceLinksInText(caption, links, shortened);
         }
 
         const finalCaption = `${header}${updatedCaption}${footer}`;
         const media = group.map((m, i) => {
-          if (m.photo) {
-            return {
-              type: 'photo',
-              media: m.photo[m.photo.length - 1].file_id,
-              caption: i === 0 ? finalCaption : undefined
-            };
-          } else if (m.video) {
-            return {
-              type: 'video',
-              media: m.video.file_id,
-              caption: i === 0 ? finalCaption : undefined
-            };
-          }
-        });
+            const mediaType = m.photo ? 'photo' : (m.video ? 'video' : null);
+            if (!mediaType) return null; // Skip unsupported media types
 
-        await bot.sendMediaGroup(chatId, media, { reply_to_message_id: group[0].message_id });
-        if (channel) {
-          await bot.sendMediaGroup(channel, media);
+            return {
+                type: mediaType,
+                media: mediaType === 'photo' ? m.photo[m.photo.length - 1].file_id : m.video.file_id,
+                caption: i === 0 ? finalCaption : undefined // Only first item gets caption
+            };
+        }).filter(Boolean); // Remove any null entries
+
+        if (media.length > 0) {
+            await sendTelegramMessage(chatId, 'mediaGroup', media, { reply_to_message_id: group[0].message_id, isUserChat: true });
+            if (channel) {
+                await sendTelegramMessage(channel, 'mediaGroup', media);
+            }
         }
-      }, 500);
+      }, 500); // Give a small delay for all media in the group to arrive
     }
-
     mediaGroups[groupId].push(msg);
     return;
   }
@@ -252,12 +311,12 @@ bot.on('message', async (msg) => {
     const caption = msg.caption || '';
     const links = extractLinks(caption);
     const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = replaceLinksInText(caption, links, shortened);
+    const updated = await replaceLinksInText(caption, links, shortened);
     const finalCaption = `${header}${updated}${footer}`;
     const photoId = msg.photo[msg.photo.length - 1].file_id;
 
-    await bot.sendPhoto(chatId, photoId, { caption: finalCaption, reply_to_message_id: msg.message_id });
-    if (channel) await bot.sendPhoto(channel, photoId, { caption: finalCaption });
+    await sendTelegramMessage(chatId, 'photo', photoId, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
+    if (channel) await sendTelegramMessage(channel, 'photo', photoId, { caption: finalCaption });
     return;
   }
 
@@ -266,11 +325,11 @@ bot.on('message', async (msg) => {
     const caption = msg.caption || '';
     const links = extractLinks(caption);
     const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = replaceLinksInText(caption, links, shortened);
+    const updated = await replaceLinksInText(caption, links, shortened);
     const finalCaption = `${header}${updated}${footer}`;
 
-    await bot.sendVideo(chatId, msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id });
-    if (channel) await bot.sendVideo(channel, msg.video.file_id, { caption: finalCaption });
+    await sendTelegramMessage(chatId, 'video', msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
+    if (channel) await sendTelegramMessage(channel, 'video', msg.video.file_id, { caption: finalCaption });
     return;
   }
 
@@ -280,19 +339,27 @@ bot.on('message', async (msg) => {
 
   if (links.length > 0) {
     const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = replaceLinksInText(content, links, shortened);
+    const updated = await replaceLinksInText(content, links, shortened);
     const finalCaption = `${header}${updated}${footer}`;
 
     if (msg.photo) {
       const photoId = msg.photo[msg.photo.length - 1].file_id;
-      await bot.sendPhoto(chatId, photoId, { caption: finalCaption, reply_to_message_id: msg.message_id });
-      if (channel) await bot.sendPhoto(channel, photoId, { caption: finalCaption });
+      await sendTelegramMessage(chatId, 'photo', photoId, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
+      if (channel) await sendTelegramMessage(channel, 'photo', photoId, { caption: finalCaption });
     } else if (msg.video) {
-      await bot.sendVideo(chatId, msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id });
-      if (channel) await bot.sendVideo(channel, msg.video.file_id, { caption: finalCaption });
-    } else {
-      await bot.sendMessage(chatId, finalCaption, { reply_to_message_id: msg.message_id });
-      if (channel) await bot.sendMessage(channel, finalCaption);
+      await sendTelegramMessage(chatId, 'video', msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
+      if (channel) await sendTelegramMessage(channel, 'video', msg.video.file_id, { caption: finalCaption });
+    } else { // Text message
+      await sendTelegramMessage(chatId, 'text', finalCaption, { reply_to_message_id: msg.message_id, isUserChat: true });
+      if (channel) await sendTelegramMessage(channel, 'text', finalCaption);
     }
+  } else if (msg.text && !msg.text.startsWith('/')) { // Only send header/footer for non-link messages if it's not a command
+      // If a non-link message is sent, but has header/footer, send it.
+      const rawText = msg.text;
+      const finalContent = `${header}${rawText}${footer}`;
+      if (rawText !== finalContent || rawText.includes("http")) { // Only send if actually modified or contains link.
+          await sendTelegramMessage(chatId, 'text', finalContent, { reply_to_message_id: msg.message_id, isUserChat: true });
+          if (channel) await sendTelegramMessage(channel, 'text', finalContent);
+      }
   }
 });
