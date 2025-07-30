@@ -96,9 +96,9 @@ async function shortenMultipleLinks(chatId, links) {
 // /start command
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
-  const username = msg.from.username || 'User';
+  const username = msg.from.fullrname || 'User';
 
-  const welcomeMessage = `😇 Hello, ${username}!\n\n`
+  const welcomeMessage = `😇 Hello, ${fullname}!\n\n`
     + 'Welcome to the powerurlshortener.link URL Shortener Bot!\n'
     + 'You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
     + 'To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
