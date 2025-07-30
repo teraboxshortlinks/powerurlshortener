@@ -34,6 +34,7 @@ bot.setMyCommands([
   { command: 'add_footer', description: 'Set custom footer text' },
   { command: 'set_channel', description: 'Set sent link channel' },
   { command: 'remove_channel', description: 'remove channel' },
+  { command: 'balance', description: 'my balance' }
   { command: 'my_channel', description: 'My channel' },
 ]);
 
@@ -291,10 +292,38 @@ bot.on('message', async (msg) => {
     });
   }
 });
-"""
+// /balance command
+bot.onText(/\/balance/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userToken = getUserToken(chatId);
 
-file_path = "/mnt/data/shortlink_bot.js"
-with open(file_path, "w") as f:
-    f.write(js_code)
+  if (!userToken) {
+    return bot.sendMessage(chatId, '⚠️ Please set your API token first using:\n/api YOUR_TOKEN');
+  }
 
-file_path
+  try {
+    const apiUrl = `https://powerurlshortener.link/api?api=${userToken}&action=userinfo`;
+    const response = await axios.get(apiUrl);
+    const data = response.data;
+
+    if (data.status === 'success') {
+      const balance = data.balance || 'N/A';
+      const clicks = data.clicks || 'N/A';
+      const totalUrls = data.shortened_urls || 'N/A';
+
+      const message = `💰 *Your Balance Info*\n\n` +
+                      `🔗 Remaining Balance: *${balance}*\n` +
+                      `👁️ Total Clicks: *${clicks}*\n` +
+                      `📄 Total Shortened URLs: *${totalUrls}*`;
+
+      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+    } else {
+      bot.sendMessage(chatId, '❌ Could not fetch balance. Please check your API token.');
+    }
+
+  } catch (err) {
+    console.error(err.message);
+    bot.sendMessage(chatId, '🚫 Error fetching balance. Please try again later.');
+  }
+});
+
