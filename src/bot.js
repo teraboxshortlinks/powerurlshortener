@@ -161,18 +161,19 @@ bot.onText(/\/start/, (msg) => {
   const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!\n\n
   🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.\n\nYou can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n
   To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n
-  If you haven't set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\nHow To Use Me 👇👇\n1.
-  Go to powerurlshortener.link & complete your registration.\n2. Then copy your API Key from https://powerurlshortener.link/member/tools/api\n3.
-  Add your API using /api <your_api>\n\n
- Example: /api f80e3447043b391084f992de73eb5970e70b0b79
+  If you haven't set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\nHow To Use Me 👇👇\n
+  1. Go to powerurlshortener.link & complete your registration.\n
+  2. Then copy your API Key from https://powerurlshortener.link/member/tools/api\n
+  3. Add your API using /api <your_api>\n\n
+ Example: /api f80e3447043b391084f992de73eb5970e70b0b79\n\n
   ⚠️ You must have to send link with https:// or http://\n\n
   ➕ /api — Set your API token (/api YOUR_TOKEN)
   ➕ /add_footer — Add a custom footer\n
   ➕ /add_header — Add a custom header\n
   ➕ /balance — Check your balance\n
   ➕ /set_channel — Set auto-post channel\n\n
-  Made with ❤️ By: https://t.me/powerurlshortener
-  👨‍💻 Created by: https://t.me/namenainai`;
+  Made with ❤️ By: https://t.me/powerurlshortener\n\n
+  👨‍💻 Created by: https://t.me/namenainai\n\n
   bot.sendMessage(chatId, welcomeMessage);
 });
 
