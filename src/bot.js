@@ -235,6 +235,72 @@ bot.onText(/\/balance/, async (msg) => {
   if (!userToken) {
     return bot.sendMessage(chatId, '⚠️ Please set your API token first using:\n/api YOUR_TOKEN');
   }
+  bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+
+  // যদি কমান্ড হয়, স্কিপ করে দিন
+  if (msg.text && msg.text.startsWith('/')) return;
+
+  const text = msg.text || msg.caption || '';
+  const links = extractLinks(text);
+
+  // যদি কোন লিংক পাওয়া যায়
+  if (links.length > 0) {
+    const shortenedLinks = await shortenMultipleLinks(chatId, links);
+    const updatedText = replaceLinksInText(text, links, shortenedLinks);
+
+    const { header, footer } = getUserHeaderFooter(chatId);
+    const finalText = header + updatedText + footer;
+
+    // যদি ছবি হয়
+    if (msg.photo) {
+      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+      await bot.sendPhoto(chatId, photoFileId, {
+        caption: finalText,
+        reply_to_message_id: msg.message_id
+      });
+    }
+
+    // যদি ভিডিও হয়
+    else if (msg.video) {
+      const videoFileId = msg.video.file_id;
+      await bot.sendVideo(chatId, videoFileId, {
+        caption: finalText,
+        reply_to_message_id: msg.message_id
+      });
+    }
+
+    // যদি শুধু টেক্সট হয়
+    else {
+      await bot.sendMessage(chatId, finalText, {
+        reply_to_message_id: msg.message_id
+      });
+    }
+
+    return; // লিংক শর্ট করার পর এখানেই থামুন
+  }
+
+  // যদি কোন লিংক না থাকে, তখন শুধু আগের মেসেজটাই রি-সেন্ড করুন
+  if (msg.photo) {
+    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+    await bot.sendPhoto(chatId, photoFileId, {
+      caption: text,
+      reply_to_message_id: msg.message_id
+    });
+  } else if (msg.video) {
+    const videoFileId = msg.video.file_id;
+    await bot.sendVideo(chatId, videoFileId, {
+      caption: text,
+      reply_to_message_id: msg.message_id
+    });
+  } else if (msg.text) {
+    await bot.sendMessage(chatId, msg.text, {
+      reply_to_message_id: msg.message_id
+    });
+  }
+});
+
+  
   try {
     const apiUrl = `https://powerurlshortener.link/api?api=${userToken}&action=userinfo`;
     const response = await axios.get(apiUrl);
@@ -254,68 +320,5 @@ bot.onText(/\/balance/, async (msg) => {
   } catch (err) {
     console.error(err.message);
     bot.sendMessage(chatId, '🚫 Error fetching balance. Please try again later.');
-  }
-});
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  if (msg.text && msg.text.startsWith('/')) return;
-
-  const text = msg.text || msg.caption || '';
-  const links = extractLinks(text);
-
-  if (links.length > 0) {
-    const shortenedLinks = await shortenMultipleLinks(chatId, links);
-    const updatedText = replaceLinksInText(text, links, shortenedLinks);
-
-    const { header, footer } = getUserHeaderFooter(chatId);
-    const finalText = header + updatedText + footer;
-
-    if (msg.photo) {
-      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-      await bot.sendPhoto(chatId, photoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    } else if (msg.video) {
-      const videoFileId = msg.video.file_id;
-      await bot.sendVideo(chatId, videoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    } else {
-      await bot.sendMessage(chatId, finalText, {
-        reply_to_message_id: msg.message_id
-      });
-    }
-
-    const targetChannel = getUserChannel(chatId);
-    if (targetChannel) {
-      try {
-        await bot.sendMessage(targetChannel, finalText);
-      } catch (err) {
-        console.error(`Error sending to channel: ${err.message}`);
-        bot.sendMessage(chatId, '⚠️ Failed to send to your channel/group. Please check bot permissions.');
-      }
-    }
-
-    return;
-  }
-
-  if (msg.photo) {
-    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-    await bot.sendPhoto(chatId, photoFileId, {
-      caption: text,
-      reply_to_message_id: msg.message_id
-    });
-  } else if (msg.video) {
-    const videoFileId = msg.video.file_id;
-    await bot.sendVideo(chatId, videoFileId, {
-      caption: text,
-      reply_to_message_id: msg.message_id
-    });
-  } else if (msg.text) {
-    await bot.sendMessage(chatId, msg.text, {
-      reply_to_message_id: msg.message_id
-    });
   }
 });
