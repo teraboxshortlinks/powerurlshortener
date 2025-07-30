@@ -164,9 +164,9 @@ bot.onText(/\/start/, (msg) => {
   If you haven't set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\nHow To Use Me 👇👇\n1.
   Go to powerurlshortener.link & complete your registration.\n2. Then copy your API Key from https://powerurlshortener.link/member/tools/api\n3.
   Add your API using /api <your_api>\n\n
- Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4
+ Example: /api f80e3447043b391084f992de73eb5970e70b0b79
   ⚠️ You must have to send link with https:// or http://\n\n
-  ➕ /api — set api\n
+  ➕ /api — Set your API token (/api YOUR_TOKEN)
   ➕ /add_footer — Add a custom footer\n
   ➕ /add_header — Add a custom header\n
   ➕ /balance — Check your balance\n
