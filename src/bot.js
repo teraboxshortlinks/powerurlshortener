@@ -126,7 +126,8 @@ async function shortenMultipleLinks(chatId, links) {
 // --- Bot Commands
 bot.onText(/\/start/, (msg) => {
   const name = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim();
-const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!
+
+  const welcomeMessage = `😇 Welcome Hello Dear, ${name}!
 
 🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
 
@@ -158,9 +159,9 @@ If you haven't set your powerurlshortener API token yet, use the command:
 🔗 Made with ❤️ by: https://t.me/powerurlshortener
 👨‍💻 Created by: https://t.me/namenainai`;
 
-
-  bot.sendMessage(msg.chat.id, welcome);
+  bot.sendMessage(msg.chat.id, welcomeMessage);
 });
+
 
 bot.onText(/\/api (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
@@ -220,37 +221,111 @@ bot.onText(/\/balance/, async (msg) => {
   }
 });
 
-// --- Main Message Handler
+// media group data temporary রাখার জন্য
+const mediaGroups = {};
+
+function replaceLinksInText(text, originalLinks, shortenedLinks) {
+  let updatedText = text;
+  originalLinks.forEach((link, index) => {
+    updatedText = updatedText.replace(link, shortenedLinks[index]);
+  });
+  return updatedText;
+}
+
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  if (msg.text && msg.text.startsWith('/')) return;
+  if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start'))) return;
 
+  const isForwarded = msg.forward_from || msg.forward_from_chat;
+
+  // ---------- যদি media group হয় ----------
+  if (msg.media_group_id) {
+    const groupId = msg.media_group_id;
+
+    // media group collect
+    if (!mediaGroups[groupId]) {
+      mediaGroups[groupId] = [];
+      setTimeout(async () => {
+        const group = mediaGroups[groupId];
+        delete mediaGroups[groupId];
+
+        if (!group || group.length === 0) return;
+
+        // caption detect (প্রথম media caption হিসেবে নিন)
+        const caption = group.find(m => m.caption)?.caption || '';
+        const links = extractLinks(caption);
+        let updatedCaption = caption;
+
+        if (links.length > 0) {
+          const shortenedLinks = await shortenMultipleLinks(chatId, links);
+          updatedCaption = replaceLinksInText(caption, links, shortenedLinks);
+        }
+
+        // সব media prepare
+        const media = group.map((m, i) => {
+          if (m.photo) {
+            const photoFileId = m.photo[m.photo.length - 1].file_id;
+            return { type: 'photo', media: photoFileId, caption: i === 0 ? updatedCaption : undefined };
+          } else if (m.video) {
+            return { type: 'video', media: m.video.file_id, caption: i === 0 ? updatedCaption : undefined };
+          }
+        });
+
+        // একবারে sendMediaGroup পাঠান
+        await bot.sendMediaGroup(chatId, media, { reply_to_message_id: group[0].message_id });
+
+      }, 500); // media group complete হওয়ার জন্য delay
+    }
+
+    mediaGroups[groupId].push(msg);
+    return;
+  }
+
+  // ---------- যদি forwarded photo ----------
+  if (isForwarded && msg.photo) {
+    const caption = msg.caption || '';
+    const links = extractLinks(caption);
+    let updatedCaption = caption;
+
+    if (links.length > 0) {
+      const shortenedLinks = await shortenMultipleLinks(chatId, links);
+      updatedCaption = replaceLinksInText(caption, links, shortenedLinks);
+    }
+
+    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+    return bot.sendPhoto(chatId, photoFileId, { caption: updatedCaption, reply_to_message_id: msg.message_id });
+  }
+
+  // ---------- যদি forwarded video ----------
+  if (isForwarded && msg.video) {
+    const caption = msg.caption || '';
+    const links = extractLinks(caption);
+    let updatedCaption = caption;
+
+    if (links.length > 0) {
+      const shortenedLinks = await shortenMultipleLinks(chatId, links);
+      updatedCaption = replaceLinksInText(caption, links, shortenedLinks);
+    }
+
+    return bot.sendVideo(chatId, msg.video.file_id, { caption: updatedCaption, reply_to_message_id: msg.message_id });
+  }
+
+  // ---------- Normal message ----------
   const text = msg.text || msg.caption || '';
   const links = extractLinks(text);
+  if (links.length > 0) {
+    const shortenedLinks = await shortenMultipleLinks(chatId, links);
+    const updatedText = replaceLinksInText(text, links, shortenedLinks);
 
-  if (links.length === 0) return;
-
-  const shortened = await shortenMultipleLinks(chatId, links);
-  const updatedText = replaceLinks(text, links, shortened);
-
-  const { header, footer } = getUserHeaderFooter(chatId);
-  const finalText = header + updatedText + footer;
-
-  if (msg.photo) {
-    const fileId = msg.photo[msg.photo.length - 1].file_id;
-    await bot.sendPhoto(chatId, fileId, {
-      caption: finalText,
-      reply_to_message_id: msg.message_id
-    });
-  } else if (msg.video) {
-    const fileId = msg.video.file_id;
-    await bot.sendVideo(chatId, fileId, {
-      caption: finalText,
-      reply_to_message_id: msg.message_id
-    });
-  } else {
-    await bot.sendMessage(chatId, finalText, {
-      reply_to_message_id: msg.message_id
-    });
+    if (msg.photo) {
+      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+      return bot.sendPhoto(chatId, photoFileId, { caption: updatedText, reply_to_message_id: msg.message_id });
+    }
+    if (msg.video) {
+      return bot.sendVideo(chatId, msg.video.file_id, { caption: updatedText, reply_to_message_id: msg.message_id });
+    }
+    return bot.sendMessage(chatId, updatedText, { reply_to_message_id: msg.message_id });
   }
 });
+
+
