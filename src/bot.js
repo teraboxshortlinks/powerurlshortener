@@ -26,6 +26,15 @@ if (!botToken) {
 // --- Telegram Bot Instance
 const bot = new TelegramBot(botToken, { polling: true });
 
+// --- Set Telegram Bot Commands for Auto-Suggest Menu
+bot.setMyCommands([
+  { command: 'start', description: 'Show welcome message' },
+  { command: 'api', description: 'Set your API token (/api YOUR_TOKEN)' },
+  { command: 'add_header', description: 'Set custom header text' },
+  { command: 'add_footer', description: 'Set custom footer text' },
+  { command: 'add', description: 'Guide: Add bot to your channel/group' }
+]);
+
 // --- Database File Setup
 const dbPath = path.join(__dirname, 'src', 'database.json');
 if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath));
@@ -123,7 +132,9 @@ bot.onText(/\/start/, (msg) => {
   const lastName = msg.from.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
 
- const welcomeMessage = `😇 Welcome Hello, ${fullName}!
+  const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!
+
+🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
 
 
      🔗Welcome to the powerurlshortener.link URL Shortener Bot!\n'
@@ -177,12 +188,28 @@ bot.onText(/\/add_footer (.+)/, (msg, match) => {
   bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
 });
 
+// /add command for help
+bot.onText(/\/add/, (msg) => {
+  const chatId = msg.chat.id;
+  const text = `➕ Hit 👉 /add command to get help about adding your channel to the bot.
+
+📌 How to add this bot to your Channel or Group:
+
+1️⃣ Add this bot as an **admin** to your Telegram **channel** or **group**.
+2️⃣ Give it permission to **Post Messages**.
+3️⃣ Once added, this bot will work the same way inside your channel or group — just send or forward links.
+
+ℹ️ If you need help, contact: @powerurlshortener`;
+
+  bot.sendMessage(chatId, text);
+});
+
 // --- Handle All Messages ---
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
   // Skip command messages
-  if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start') || msg.text.startsWith('/sethf') || msg.text.startsWith('/add_header') || msg.text.startsWith('/add_footer'))) return;
+  if (msg.text && msg.text.startsWith('/')) return;
 
   const isForwarded = msg.forward_from || msg.forward_from_chat;
 
