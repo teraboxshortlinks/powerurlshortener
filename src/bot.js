@@ -100,20 +100,20 @@ bot.onText(/\/start/, (msg) => {
   const lastName = msg.from.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
 
-  const welcomeMessage = `🔰 Welcome, ${fullName}!
+  const welcomeMessage = `😇 Welcome Hello, ${fullName}!
 
 
-    + 🔗'Welcome to the powerurlshortener.link URL Shortener Bot!\n'
-    + 'You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
-    + 'To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
-    + 'If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
-    + 'How To Use Me 👇👇 \n\n powerurlshortener.link & Complete Your Registration.\n\n'
-  + '✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. \n\n'
-  + '✅3. Then add your API using command /api \n\n' 
-  + 'Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
-  + '⚠️ You must have to send link with https:// or http://\n\n'
-  + 'Made with ❤️ By: https://t.me/powerurlshortener';
-  + '**Now, go ahead and try it out!**';
+     🔗Welcome to the powerurlshortener.link URL Shortener Bot!\n'
+    You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
+    To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
+    If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
+    How To Use Me 👇👇 \n\n powerurlshortener.link & Complete Your Registration.\n\n'
+  ✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. \n\n'
+  ✅3. Then add your API using command /api \n\n' 
+  Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
+  ⚠️ You must have to send link with https:// or http://\n\n'
+  Made with ❤️ By: https://t.me/powerurlshortener';
+  **Now, go ahead and try it out!**';
 
 🔥 Now send me any message or post containing links and I’ll shorten them for you!
 
