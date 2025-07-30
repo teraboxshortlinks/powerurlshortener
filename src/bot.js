@@ -100,10 +100,10 @@ bot.onText(/\/start/, (msg) => {
   const lastName = msg.from.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
 
-  const welcomeMessage = `😇 Hello, ${fullName}!
+  const welcomeMessage = `🔰 Welcome, ${fullName}!
 
-  
-    + 'Welcome to the powerurlshortener.link URL Shortener Bot!\n'
+
+    + 🔗'Welcome to the powerurlshortener.link URL Shortener Bot!\n'
     + 'You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
     + 'To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
     + 'If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
@@ -115,6 +115,9 @@ bot.onText(/\/start/, (msg) => {
   + 'Made with ❤️ By: https://t.me/powerurlshortener';
   + '**Now, go ahead and try it out!**';
 
+🔥 Now send me any message or post containing links and I’ll shorten them for you!
+
+👨‍💻 Created by: https://t.me/namenainai`; 
 
   bot.sendMessage(chatId, welcomeMessage);
 });
@@ -150,14 +153,18 @@ bot.on('message', async (msg) => {
     const shortenedLinks = await shortenMultipleLinks(chatId, links);
     const updatedText = replaceLinksInText(text, links, shortenedLinks);
 
+    const header = '🔗 Shortened Links:\n';
+    const footer = '\n✅ Powered by PowerURLShortener.link';
+    const finalText = header + updatedText + footer;
+
     if (msg.photo) {
       const photoFileId = msg.photo[msg.photo.length - 1].file_id;
       await bot.sendPhoto(chatId, photoFileId, {
-        caption: updatedText,
+        caption: finalText,
         reply_to_message_id: msg.message_id
       });
     } else {
-      await bot.sendMessage(chatId, updatedText, { reply_to_message_id: msg.message_id });
+      await bot.sendMessage(chatId, finalText, { reply_to_message_id: msg.message_id });
     }
     return;
   }
