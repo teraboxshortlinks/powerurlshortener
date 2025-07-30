@@ -34,9 +34,10 @@ bot.setMyCommands([
   { command: 'add_footer', description: 'Set custom footer text' },
   { command: 'set_channel', description: 'Set sent link channel' },
   { command: 'remove_channel', description: 'remove channel' },
-  { command: 'balance', description: 'my balance' }
-  { command: 'my_channel', description: 'My channel' },
+  { command: 'balance', description: 'my balance' },
+  { command: 'my_channel', description: 'My channel' }
 ]);
+
 
 // --- Database File Setup
 const dbPath = path.join(__dirname, 'src', 'database.json');
@@ -91,7 +92,8 @@ function getUserHeaderFooter(chatId) {
 
 // --- URL Extract & Replace Functions
 function extractLinks(text) {
-  const urlRegex = /(https?:\\/\\/[^\\s]+|www\\.[^\\s]+)/g;
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+
   return [...text.matchAll(urlRegex)].map(match => match[0]);
 }
 
@@ -154,7 +156,8 @@ function removeUserChannel(chatId) {
 
 // --- Telegram Bot Handlers ---
 
-bot.onText(/\\/start/, (msg) => {
+bot.onText(/\/start/, (msg) => {
+
   const chatId = msg.chat.id;
   const firstName = msg.from.first_name || '';
   const lastName = msg.from.last_name || '';
@@ -174,7 +177,8 @@ Created by: https://t.me/namenainai`;
   bot.sendMessage(chatId, welcomeMessage);
 });
 
-bot.onText(/\\/api (.+)/, (msg, match) => {
+  bot.onText(/\/api (.+)/, (msg, match) => {
+
   const chatId = msg.chat.id;
   const newToken = match[1].trim();
   const oldToken = getUserToken(chatId);
@@ -188,28 +192,28 @@ bot.onText(/\\/api (.+)/, (msg, match) => {
   bot.sendMessage(chatId, `✅ Your API token has been saved successfully.`);
 });
 
-bot.onText(/\\/add_header (.+)/, (msg, match) => {
+bot.onText(/\/add_header (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   const header = match[1].trim();
   saveUserHeader(chatId, header);
   bot.sendMessage(chatId, `✅ Your custom header has been saved.`);
 });
 
-bot.onText(/\\/add_footer (.+)/, (msg, match) => {
+bot.onText(/\/add_footer (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   const footer = match[1].trim();
   saveUserFooter(chatId, footer);
   bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
 });
 
-bot.onText(/\\/set_channel (.+)/, (msg, match) => {
+bot.onText(/\/set_channel (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   const channelId = match[1].trim();
   saveUserChannel(chatId, channelId);
   bot.sendMessage(chatId, `✅ Your channel/group has been set: ${channelId}`);
 });
 
-bot.onText(/\\/remove_channel/, (msg) => {
+bot.onText(/\/remove_channel/, (msg) => {
   const chatId = msg.chat.id;
   const removed = removeUserChannel(chatId);
   if (removed) {
@@ -219,7 +223,7 @@ bot.onText(/\\/remove_channel/, (msg) => {
   }
 });
 
-bot.onText(/\\/my_channel/, (msg) => {
+bot.onText(/\/my_channel/, (msg) => {
   const chatId = msg.chat.id;
   const channelId = getUserChannel(chatId);
   if (channelId) {
