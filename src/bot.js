@@ -26,138 +26,106 @@ if (!botToken) {
 // --- Telegram Bot Instance
 const bot = new TelegramBot(botToken, { polling: true });
 
-// --- Set Telegram Bot Commands for Auto-Suggest Menu
+// --- Set Bot Commands
 bot.setMyCommands([
   { command: 'start', description: 'Show welcome message' },
   { command: 'api', description: 'Set your API token (/api YOUR_TOKEN)' },
   { command: 'add_header', description: 'Set custom header text' },
   { command: 'add_footer', description: 'Set custom footer text' },
   { command: 'set_channel', description: 'Set sent link channel' },
-  { command: 'remove_channel', description: 'remove channel' },
-  { command: 'balance', description: 'my balance' },
+  { command: 'remove_channel', description: 'Remove channel' },
+  { command: 'balance', description: 'My balance' },
   { command: 'my_channel', description: 'My channel' }
 ]);
 
-// --- Database File Setup
+// --- Database Setup
 const dbPath = path.join(__dirname, 'src', 'database.json');
 if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath));
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '{}');
 
-// --- Database Functions
 function getDatabaseData() {
   try {
     return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
-  } catch (error) {
+  } catch {
     return {};
   }
 }
 
-function saveUserToken(chatId, token) {
-  const dbData = getDatabaseData();
-  if (!dbData[chatId]) dbData[chatId] = {};
-  dbData[chatId].token = token;
-  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+function saveToDatabase(chatId, key, value) {
+  const db = getDatabaseData();
+  if (!db[chatId]) db[chatId] = {};
+  db[chatId][key] = value;
+  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
 }
 
-function getUserToken(chatId) {
-  const dbData = getDatabaseData();
-  return dbData[chatId]?.token;
+function getFromDatabase(chatId, key) {
+  const db = getDatabaseData();
+  return db[chatId]?.[key];
 }
 
-function saveUserHeader(chatId, header) {
-  const dbData = getDatabaseData();
-  if (!dbData[chatId]) dbData[chatId] = {};
-  dbData[chatId].header = header;
-  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
-}
-
-function saveUserFooter(chatId, footer) {
-  const dbData = getDatabaseData();
-  if (!dbData[chatId]) dbData[chatId] = {};
-  dbData[chatId].footer = footer;
-  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
-}
-
-function getUserHeaderFooter(chatId) {
-  const dbData = getDatabaseData();
-  const customHeader = dbData[chatId]?.header || '';
-  const customFooter = dbData[chatId]?.footer || '';
-
-  return {
-    header: `🔗 Links:\n\n${customHeader ? customHeader + '' : ''}`,
-    footer: `${customFooter ? '' + customFooter : ''}\n\n\✅ Powered by PowerURLShortener.link`
-  };
-}
-
-// --- URL Extract & Replace Functions
-function extractLinks(text) {
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-  return [...text.matchAll(urlRegex)].map(match => match[0]);
-}
-
-function replaceLinksInText(text, originalLinks, shortenedLinks) {
-  let updatedText = text;
-  originalLinks.forEach((link, index) => {
-    updatedText = updatedText.replace(link, shortenedLinks[index]);
-  });
-  return updatedText;
-}
-
-// --- URL Shortener
-async function shortenUrl(chatId, url) {
-  const userToken = getUserToken(chatId);
-  if (!userToken) {
-    bot.sendMessage(chatId, '⚠️ You have not set your API token.\nPlease use:\n/api YOUR_API_TOKEN');
-    return null;
-  }
-  try {
-    const apiUrl = `https://powerurlshortener.link/api?api=${userToken}&url=${encodeURIComponent(url)}`;
-    const response = await axios.get(apiUrl);
-    return response.data.shortenedUrl || response.data.shortened || response.data.short || url;
-  } catch (error) {
-    console.error('Shorten URL Error:', error.message);
-    return url;
-  }
-}
-
-async function shortenMultipleLinks(chatId, links) {
-  const shortenedLinks = [];
-  for (const link of links) {
-    const shortened = await shortenUrl(chatId, link);
-    shortenedLinks.push(shortened || link);
-  }
-  return shortenedLinks;
-}
-
-// --- Channel Management
-function saveUserChannel(chatId, channelId) {
-  const dbData = getDatabaseData();
-  if (!dbData[chatId]) dbData[chatId] = {};
-  dbData[chatId].channel = channelId;
-  fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
-}
-
-function getUserChannel(chatId) {
-  const dbData = getDatabaseData();
-  return dbData[chatId]?.channel;
-}
-
-function removeUserChannel(chatId) {
-  const dbData = getDatabaseData();
-  if (dbData[chatId] && dbData[chatId].channel) {
-    delete dbData[chatId].channel;
-    fs.writeFileSync(dbPath, JSON.stringify(dbData, null, 2));
+function deleteFromDatabase(chatId, key) {
+  const db = getDatabaseData();
+  if (db[chatId] && db[chatId][key]) {
+    delete db[chatId][key];
+    fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
     return true;
   }
   return false;
 }
 
-// --- Telegram Bot Handlers ---
+// --- Header/Footer
+function getUserHeaderFooter(chatId) {
+  const header = getFromDatabase(chatId, 'header') || '';
+  const footer = getFromDatabase(chatId, 'footer') || '';
+  return {
+    header: `🔗 Links:\n${header ? header + '\n' : ''}`,
+    footer: `${footer ? '\n' + footer : ''}\n✅ Powered by PowerURLShortener.link`
+  };
+}
+
+// --- Link Handling
+function extractLinks(text) {
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+  return [...text.matchAll(urlRegex)].map(match => match[0]);
+}
+
+function replaceLinks(text, original, shortened) {
+  let updated = text;
+  original.forEach((link, idx) => {
+    updated = updated.replace(link, shortened[idx]);
+  });
+  return updated;
+}
+
+async function shortenUrl(chatId, url) {
+  const token = getFromDatabase(chatId, 'token');
+  if (!token) {
+    bot.sendMessage(chatId, '⚠️ Please set your API token using:\n/api YOUR_API_TOKEN');
+    return null;
+  }
+
+  try {
+    const apiUrl = `https://powerurlshortener.link/api?api=${token}&url=${encodeURIComponent(url)}`;
+    const res = await axios.get(apiUrl);
+    return res.data.shortenedUrl || res.data.shortened || res.data.short || url;
+  } catch (err) {
+    console.error('Shorten URL Error:', err.message);
+    return url;
+  }
+}
+
+async function shortenMultipleLinks(chatId, links) {
+  const results = [];
+  for (const link of links) {
+    const short = await shortenUrl(chatId, link);
+    results.push(short || link);
+  }
+  return results;
+}
+
+// --- Bot Commands
 bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  const firstName = msg.from.first_name || '';
-  const lastName = msg.from.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim();
+  const name = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim();
   const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!\n\n
   🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.\n\nYou can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n
   To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n
@@ -174,151 +142,99 @@ bot.onText(/\/start/, (msg) => {
   ➕ /set_channel — Set auto-post channel\n\n
   Made with ❤️ By: https://t.me/powerurlshortener\n\n
   👨‍💻 Created by: https://t.me/namenainai\n\n
-  bot.sendMessage(chatId, welcomeMessage);
+
+  bot.sendMessage(msg.chat.id, welcome);
 });
 
 bot.onText(/\/api (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
-  const newToken = match[1].trim();
-  const oldToken = getUserToken(chatId);
-  if (oldToken && oldToken === newToken) {
-    return bot.sendMessage(chatId, 'ℹ️ This API token is already set.');
-  }
-  saveUserToken(chatId, newToken);
-  bot.sendMessage(chatId, "✅ Your API token has been saved successfully.");
+  const token = match[1].trim();
+  saveToDatabase(chatId, 'token', token);
+  bot.sendMessage(chatId, '✅ Your API token has been saved.');
 });
 
 bot.onText(/\/add_header (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const header = match[1].trim();
-  saveUserHeader(chatId, header);
-  bot.sendMessage(chatId, `✅ Your custom header has been saved.`);
+  saveToDatabase(msg.chat.id, 'header', match[1].trim());
+  bot.sendMessage(msg.chat.id, '✅ Your custom header has been saved.');
 });
 
 bot.onText(/\/add_footer (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const footer = match[1].trim();
-  saveUserFooter(chatId, footer);
-  bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
+  saveToDatabase(msg.chat.id, 'footer', match[1].trim());
+  bot.sendMessage(msg.chat.id, '✅ Your custom footer has been saved.');
 });
 
 bot.onText(/\/set_channel (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const channelId = match[1].trim();
-  saveUserChannel(chatId, channelId);
-  bot.sendMessage(chatId, `✅ Your channel/group has been set: ${channelId}`);
+  saveToDatabase(msg.chat.id, 'channel', match[1].trim());
+  bot.sendMessage(msg.chat.id, '✅ Your channel/group has been set.');
 });
 
 bot.onText(/\/remove_channel/, (msg) => {
-  const chatId = msg.chat.id;
-  const removed = removeUserChannel(chatId);
-  if (removed) {
-    bot.sendMessage(chatId, '✅ Your channel/group has been removed.');
-  } else {
-    bot.sendMessage(chatId, 'ℹ️ No channel/group was set.');
-  }
+  const removed = deleteFromDatabase(msg.chat.id, 'channel');
+  bot.sendMessage(msg.chat.id, removed ? '✅ Channel removed.' : 'ℹ️ No channel was set.');
 });
 
 bot.onText(/\/my_channel/, (msg) => {
-  const chatId = msg.chat.id;
-  const channelId = getUserChannel(chatId);
-  if (channelId) {
-    bot.sendMessage(chatId, `📢 Your current set channel/group:\n${channelId}`);
-  } else {
-    bot.sendMessage(chatId, `ℹ️ No channel/group is currently set.\nUse /set_channel @yourchannel to set one.`);
-  }
+  const channel = getFromDatabase(msg.chat.id, 'channel');
+  bot.sendMessage(msg.chat.id, channel ? `📢 Current channel: ${channel}` : 'No channel set.\nUse /set_channel @yourchannel');
 });
 
 bot.onText(/\/balance/, async (msg) => {
   const chatId = msg.chat.id;
-  const userToken = getUserToken(chatId);
-  if (!userToken) {
-    return bot.sendMessage(chatId, '⚠️ Please set your API token first using:\n/api YOUR_TOKEN');
-  }
-  bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
+  const token = getFromDatabase(chatId, 'token');
 
-  // যদি কমান্ড হয়, স্কিপ করে দিন
+  if (!token) return bot.sendMessage(chatId, '⚠️ Please set your API token first with /api YOUR_TOKEN');
+
+  try {
+    const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&action=userinfo`);
+    const d = res.data;
+
+    if (d.status === 'success') {
+      const text = `💰 *Your Balance Info*\n\n` +
+        `🔹 Balance: $${d.balance || 'N/A'}\n` +
+        `👁️ Total Clicks: *${d.clicks || 'N/A'}*\n` +
+        `📄 Total Shortened URLs: *${d.shortened_urls || 'N/A'}*`;
+
+      bot.sendMessage(chatId, text, { parse_mode: 'Markdown' });
+    } else {
+      bot.sendMessage(chatId, '❌ Invalid API token or failed to fetch data.');
+    }
+  } catch (err) {
+    console.error(err.message);
+    bot.sendMessage(chatId, '🚫 Error fetching balance. Try again later.');
+  }
+});
+
+// --- Main Message Handler
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
   if (msg.text && msg.text.startsWith('/')) return;
 
   const text = msg.text || msg.caption || '';
   const links = extractLinks(text);
 
-  // যদি কোন লিংক পাওয়া যায়
-  if (links.length > 0) {
-    const shortenedLinks = await shortenMultipleLinks(chatId, links);
-    const updatedText = replaceLinksInText(text, links, shortenedLinks);
+  if (links.length === 0) return;
 
-    const { header, footer } = getUserHeaderFooter(chatId);
-    const finalText = header + updatedText + footer;
+  const shortened = await shortenMultipleLinks(chatId, links);
+  const updatedText = replaceLinks(text, links, shortened);
 
-    // যদি ছবি হয়
-    if (msg.photo) {
-      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-      await bot.sendPhoto(chatId, photoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    }
+  const { header, footer } = getUserHeaderFooter(chatId);
+  const finalText = header + updatedText + footer;
 
-    // যদি ভিডিও হয়
-    else if (msg.video) {
-      const videoFileId = msg.video.file_id;
-      await bot.sendVideo(chatId, videoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    }
-
-    // যদি শুধু টেক্সট হয়
-    else {
-      await bot.sendMessage(chatId, finalText, {
-        reply_to_message_id: msg.message_id
-      });
-    }
-
-    return; // লিংক শর্ট করার পর এখানেই থামুন
-  }
-
-  // যদি কোন লিংক না থাকে, তখন শুধু আগের মেসেজটাই রি-সেন্ড করুন
   if (msg.photo) {
-    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-    await bot.sendPhoto(chatId, photoFileId, {
-      caption: text,
+    const fileId = msg.photo[msg.photo.length - 1].file_id;
+    await bot.sendPhoto(chatId, fileId, {
+      caption: finalText,
       reply_to_message_id: msg.message_id
     });
   } else if (msg.video) {
-    const videoFileId = msg.video.file_id;
-    await bot.sendVideo(chatId, videoFileId, {
-      caption: text,
+    const fileId = msg.video.file_id;
+    await bot.sendVideo(chatId, fileId, {
+      caption: finalText,
       reply_to_message_id: msg.message_id
     });
-  } else if (msg.text) {
-    await bot.sendMessage(chatId, msg.text, {
+  } else {
+    await bot.sendMessage(chatId, finalText, {
       reply_to_message_id: msg.message_id
     });
-  }
-});
-
-  
-  try {
-    const apiUrl = `https://powerurlshortener.link/api?api=${userToken}&action=userinfo`;
-    const response = await axios.get(apiUrl);
-    const data = response.data;
-    if (data.status === 'success') {
-      const balance = data.balance || 'N/A';
-      const clicks = data.clicks || 'N/A';
-      const totalUrls = data.shortened_urls || 'N/A';
-      const message = `💰 *Your Balance Info*\n\n` +
-                      `🔗 Remaining Balance: *${balance}*\n` +
-                      `👁️ Total Clicks: *${clicks}*\n` +
-                      `📄 Total Shortened URLs: *${totalUrls}*`;
-      bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
-    } else {
-      bot.sendMessage(chatId, '❌ Could not fetch balance. Please check your API token.');
-    }
-  } catch (err) {
-    console.error(err.message);
-    bot.sendMessage(chatId, '🚫 Error fetching balance. Please try again later.');
   }
 });
