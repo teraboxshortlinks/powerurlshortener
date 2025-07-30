@@ -218,8 +218,8 @@ Now, go ahead and try it out!**';
   const oldToken = getUserToken(chatId);
 
   if (oldToken && oldToken === newToken) {
-    bot.sendMessage(chatId, `ℹ️ This API token is already set.`);
-    return;
+    bot.sendMessage(chatId, 'ℹ️ This API token is already set.');
+
   }
 
   saveUserToken(chatId, newToken);
