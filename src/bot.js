@@ -31,7 +31,10 @@ bot.setMyCommands([
   { command: 'start', description: 'Show welcome message' },
   { command: 'api', description: 'Set your API token (/api YOUR_TOKEN)' },
   { command: 'add_header', description: 'Set custom header text' },
-  { command: 'add_footer', description: 'Set custom footer text' }
+  { command: 'add_footer', description: 'Set custom footer text' },
+  { command: 'set_channel', description: 'Set sent link channel' },
+  { command: 'remove_channel', description: 'remove channel' },
+  { command: 'my_channel', description: 'My channel' },
 ]);
 
 // --- Database File Setup
@@ -80,14 +83,14 @@ function getUserHeaderFooter(chatId) {
   const customFooter = dbData[chatId]?.footer || '';
 
   return {
-    header: `🔗 Shortened Links:\n${customHeader ? customHeader + '\n' : ''}`,
-    footer: `${customFooter ? '\n' + customFooter : ''}\n✅ Powered by PowerURLShortener.link`
+    header: `🔗 Shortened Links:\\n${customHeader ? customHeader + '\\n' : ''}`,
+    footer: `${customFooter ? '\\n' + customFooter : ''}\\n✅ Powered by PowerURLShortener.link`
   };
 }
 
 // --- URL Extract & Replace Functions
 function extractLinks(text) {
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+  const urlRegex = /(https?:\\/\\/[^\\s]+|www\\.[^\\s]+)/g;
   return [...text.matchAll(urlRegex)].map(match => match[0]);
 }
 
@@ -103,7 +106,7 @@ function replaceLinksInText(text, originalLinks, shortenedLinks) {
 async function shortenUrl(chatId, url) {
   const userToken = getUserToken(chatId);
   if (!userToken) {
-    bot.sendMessage(chatId, '⚠️ You have not set your API token.\nPlease use:\n/api YOUR_API_TOKEN');
+    bot.sendMessage(chatId, '⚠️ You have not set your API token.\\nPlease use:\\n/api YOUR_API_TOKEN');
     return null;
   }
   try {
@@ -125,146 +128,7 @@ async function shortenMultipleLinks(chatId, links) {
   return shortenedLinks;
 }
 
-// --- Telegram Bot Handlers ---
-
-// /start command
-bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  const firstName = msg.from.first_name || '';
-  const lastName = msg.from.last_name || '';
-  const fullName = `${firstName} ${lastName}`.trim();
-
-  const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!
-
-  🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
-
-
-       🔗Welcome to the powerurlshortener.link URL Shortener Bot!\n'
-      You can use this bot to shorten URLs using the powerurlshortener.link api service.\n\n'
-      To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\n'
-      If you haven\'t set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\n'
-      How To Use Me 👇👇 \n\n powerurlshortener.link & Complete Your Registration.\n\n'
-    ✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. \n\n'
-    ✅3. Then add your API using command /api \n\n' 
-    Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4\n\n'
-    ⚠️ You must have to send link with https:// or http://\n\n'
-    Made with ❤️ By: https://t.me/powerurlshortener';
-    **Now, go ahead and try it out!**';
-  ➕ Hit 👉 /add_footer To Get Help About Adding your Custom Footer to bot.
-  ➕ Hit 👉 /add_header To Get Help About Adding your Custom Footer to bot.
-  🔥 Now send me any message or post containing links and I’ll shorten them for you!
-
-  👨‍💻 Created by: https://t.me/namenainai`; 
-
-
-  bot.sendMessage(chatId, welcomeMessage);
-});
-
-// /api command
-bot.onText(/\/api (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const newToken = match[1].trim();
-  const oldToken = getUserToken(chatId);
-
-  if (oldToken && oldToken === newToken) {
-    bot.sendMessage(chatId, `ℹ️ This API token is already set.`);
-    return;
-  }
-
-  saveUserToken(chatId, newToken);
-  bot.sendMessage(chatId, `✅ Your API token has been saved successfully.`);
-});
-
-// /add_header command
-bot.onText(/\/add_header (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const header = match[1].trim();
-  saveUserHeader(chatId, header);
-  bot.sendMessage(chatId, `✅ Your custom header has been saved.`);
-});
-
-// /add_footer command
-bot.onText(/\/add_footer (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const footer = match[1].trim();
-  saveUserFooter(chatId, footer);
-  bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
-});
-
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-
-  // যদি কমান্ড হয়, স্কিপ করে দিন
-  if (msg.text && msg.text.startsWith('/')) return;
-
-  const text = msg.text || msg.caption || '';
-  const links = extractLinks(text);
-
-  // যদি কোন লিংক পাওয়া যায়
-  if (links.length > 0) {
-    const shortenedLinks = await shortenMultipleLinks(chatId, links);
-    const updatedText = replaceLinksInText(text, links, shortenedLinks);
-
-    const { header, footer } = getUserHeaderFooter(chatId);
-    const finalText = header + updatedText + footer;
-
-    // যদি ছবি হয়
-    if (msg.photo) {
-      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-      await bot.sendPhoto(chatId, photoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    }
-
-    // যদি ভিডিও হয়
-    else if (msg.video) {
-      const videoFileId = msg.video.file_id;
-      await bot.sendVideo(chatId, videoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    }
-
-    // যদি শুধু টেক্সট হয়
-    else {
-      await bot.sendMessage(chatId, finalText, {
-        reply_to_message_id: msg.message_id
-      });
-    }
-
-    return; // লিংক শর্ট করার পর এখানেই থামুন
-  }
-
-  // যদি কোন লিংক না থাকে, তখন শুধু আগের মেসেজটাই রি-সেন্ড করুন
-  if (msg.photo) {
-    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-    await bot.sendPhoto(chatId, photoFileId, {
-      caption: text,
-      reply_to_message_id: msg.message_id
-    });
-  } else if (msg.video) {
-    const videoFileId = msg.video.file_id;
-    await bot.sendVideo(chatId, videoFileId, {
-      caption: text,
-      reply_to_message_id: msg.message_id
-    });
-  } else if (msg.text) {
-    await bot.sendMessage(chatId, msg.text, {
-      reply_to_message_id: msg.message_id
-    });
-  }
-});
-// অটো চ্যানেল বা গ্রুপে পোস্ট
-const targetChannel = getUserChannel(chatId);
-if (targetChannel) {
-  try {
-    await bot.sendMessage(targetChannel, finalText);
-  } catch (err) {
-    console.error(`❌ চ্যানেল/গ্রুপে সেন্ড করতে সমস্যা: ${err.message}`);
-    bot.sendMessage(chatId, '⚠️ চ্যানেলে/গ্রুপে মেসেজ পাঠানো যায়নি। বটকে অ্যাডমিন দিয়েছেন কি না চেক করুন।');
-  }
-}
+// --- Channel Management
 function saveUserChannel(chatId, channelId) {
   const dbData = getDatabaseData();
   if (!dbData[chatId]) dbData[chatId] = {};
@@ -286,31 +150,151 @@ function removeUserChannel(chatId) {
   }
   return false;
 }
-bot.onText(/\/set_channel (.+)/, (msg, match) => {
-  const chatId = msg.chat.id;
-  const channelId = match[1].trim(); // যেমন @mychannel বা -100xxxxxxxxxx
 
-  saveUserChannel(chatId, channelId);
-  bot.sendMessage(chatId, `✅ আপনার চ্যানেল/গ্রুপ সেট করা হয়েছে: ${channelId}\n
-⚠️ নিশ্চিত হন যে আপনি বটকে আপনার চ্যানেল বা গ্রুপে অ্যাড করে অ্যাডমিন দিয়েছেন।`);
+// --- Telegram Bot Handlers ---
+
+bot.onText(/\\/start/, (msg) => {
+  const chatId = msg.chat.id;
+  const firstName = msg.from.first_name || '';
+  const lastName = msg.from.last_name || '';
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!
+
+🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
+
+To shorten a URL, just type or paste it directly here.
+
+If you haven't set your API token yet, use the command:
+/api YOUR_API_TOKEN
+
+Created by: https://t.me/namenainai`;
+
+  bot.sendMessage(chatId, welcomeMessage);
 });
-bot.onText(/\/remove_channel/, (msg) => {
+
+bot.onText(/\\/api (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const newToken = match[1].trim();
+  const oldToken = getUserToken(chatId);
+
+  if (oldToken && oldToken === newToken) {
+    bot.sendMessage(chatId, `ℹ️ This API token is already set.`);
+    return;
+  }
+
+  saveUserToken(chatId, newToken);
+  bot.sendMessage(chatId, `✅ Your API token has been saved successfully.`);
+});
+
+bot.onText(/\\/add_header (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const header = match[1].trim();
+  saveUserHeader(chatId, header);
+  bot.sendMessage(chatId, `✅ Your custom header has been saved.`);
+});
+
+bot.onText(/\\/add_footer (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const footer = match[1].trim();
+  saveUserFooter(chatId, footer);
+  bot.sendMessage(chatId, `✅ Your custom footer has been saved.`);
+});
+
+bot.onText(/\\/set_channel (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const channelId = match[1].trim();
+  saveUserChannel(chatId, channelId);
+  bot.sendMessage(chatId, `✅ Your channel/group has been set: ${channelId}`);
+});
+
+bot.onText(/\\/remove_channel/, (msg) => {
   const chatId = msg.chat.id;
   const removed = removeUserChannel(chatId);
-
   if (removed) {
-    bot.sendMessage(chatId, '✅ আপনার সেট করা চ্যানেল সফলভাবে মুছে ফেলা হয়েছে।');
+    bot.sendMessage(chatId, '✅ Your channel/group has been removed.');
   } else {
-    bot.sendMessage(chatId, 'ℹ️ কোনো চ্যানেল সেট করা ছিল না।');
+    bot.sendMessage(chatId, 'ℹ️ No channel/group was set.');
   }
 });
-bot.onText(/\/my_channel/, (msg) => {
+
+bot.onText(/\\/my_channel/, (msg) => {
   const chatId = msg.chat.id;
   const channelId = getUserChannel(chatId);
-
   if (channelId) {
-    bot.sendMessage(chatId, `📢 আপনার সেট করা চ্যানেল/গ্রুপ:\n${channelId}`);
+    bot.sendMessage(chatId, `📢 Your current set channel/group:\n${channelId}`);
   } else {
-    bot.sendMessage(chatId, `ℹ️ আপনি এখনো কোনো চ্যানেল সেট করেননি।\n/set_channel @yourchannel এই কমান্ড ব্যবহার করুন।`);
+    bot.sendMessage(chatId, `ℹ️ No channel/group is currently set.\nUse /set_channel @yourchannel to set one.`);
   }
 });
+
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  if (msg.text && msg.text.startsWith('/')) return;
+
+  const text = msg.text || msg.caption || '';
+  const links = extractLinks(text);
+
+  if (links.length > 0) {
+    const shortenedLinks = await shortenMultipleLinks(chatId, links);
+    const updatedText = replaceLinksInText(text, links, shortenedLinks);
+
+    const { header, footer } = getUserHeaderFooter(chatId);
+    const finalText = header + updatedText + footer;
+
+    if (msg.photo) {
+      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+      await bot.sendPhoto(chatId, photoFileId, {
+        caption: finalText,
+        reply_to_message_id: msg.message_id
+      });
+    } else if (msg.video) {
+      const videoFileId = msg.video.file_id;
+      await bot.sendVideo(chatId, videoFileId, {
+        caption: finalText,
+        reply_to_message_id: msg.message_id
+      });
+    } else {
+      await bot.sendMessage(chatId, finalText, {
+        reply_to_message_id: msg.message_id
+      });
+    }
+
+    const targetChannel = getUserChannel(chatId);
+    if (targetChannel) {
+      try {
+        await bot.sendMessage(targetChannel, finalText);
+      } catch (err) {
+        console.error(`Error sending to channel: ${err.message}`);
+        bot.sendMessage(chatId, '⚠️ Failed to send to your channel/group. Please check bot permissions.');
+      }
+    }
+
+    return;
+  }
+
+  if (msg.photo) {
+    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+    await bot.sendPhoto(chatId, photoFileId, {
+      caption: text,
+      reply_to_message_id: msg.message_id
+    });
+  } else if (msg.video) {
+    const videoFileId = msg.video.file_id;
+    await bot.sendVideo(chatId, videoFileId, {
+      caption: text,
+      reply_to_message_id: msg.message_id
+    });
+  } else if (msg.text) {
+    await bot.sendMessage(chatId, msg.text, {
+      reply_to_message_id: msg.message_id
+    });
+  }
+});
+"""
+
+file_path = "/mnt/data/shortlink_bot.js"
+with open(file_path, "w") as f:
+    f.write(js_code)
+
+file_path
