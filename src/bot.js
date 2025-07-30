@@ -38,7 +38,6 @@ bot.setMyCommands([
   { command: 'my_channel', description: 'My channel' }
 ]);
 
-
 // --- Database File Setup
 const dbPath = path.join(__dirname, 'src', 'database.json');
 if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath));
@@ -85,15 +84,14 @@ function getUserHeaderFooter(chatId) {
   const customFooter = dbData[chatId]?.footer || '';
 
   return {
-    header: `🔗 Links:\\n${customHeader ? customHeader + '\\n' : ''}`,
-    footer: `${customFooter ? '\\n' + customFooter : ''}\\n✅ Powered by PowerURLShortener.link`
+    header: `🔗 Links:\n${customHeader ? customHeader + '\n' : ''}`,
+    footer: `${customFooter ? '\n' + customFooter : ''}\n✅ Powered by PowerURLShortener.link`
   };
 }
 
 // --- URL Extract & Replace Functions
 function extractLinks(text) {
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-
   return [...text.matchAll(urlRegex)].map(match => match[0]);
 }
 
@@ -109,7 +107,7 @@ function replaceLinksInText(text, originalLinks, shortenedLinks) {
 async function shortenUrl(chatId, url) {
   const userToken = getUserToken(chatId);
   if (!userToken) {
-    bot.sendMessage(chatId, '⚠️ You have not set your API token.\\nPlease use:\\n/api YOUR_API_TOKEN');
+    bot.sendMessage(chatId, '⚠️ You have not set your API token.\nPlease use:\n/api YOUR_API_TOKEN');
     return null;
   }
   try {
@@ -155,73 +153,22 @@ function removeUserChannel(chatId) {
 }
 
 // --- Telegram Bot Handlers ---
-
 bot.onText(/\/start/, (msg) => {
-
   const chatId = msg.chat.id;
   const firstName = msg.from.first_name || '';
   const lastName = msg.from.last_name || '';
   const fullName = `${firstName} ${lastName}`.trim();
-
-  const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!
-
-
-
- 🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.
-
-
-🔗Welcome to the powerurlshortener.link URL Shortener Bot!
-
- You can use this bot to shorten URLs using the powerurlshortener.link api service.
-
-
- To shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.
-
-
-If you haven't set your powerurlshortener API token yet, use the command:
-/api YOUR_powerurlshortener_API_TOKEN
-
-
-How To Use Me 👇👇 
-
-powerurlshortener.link & Complete Your Registration.
-
-
-✅2. Then Copy Your API Key from here https://powerurlshortener.link/member/tools/api Copy Your API Only. 
-
-✅3. Then add your API using command /api 
-
-Example: /api c49399f821fc020161bc2a31475ec59f35ae5b4
-
-
-⚠️ You must have to send link with https:// or http://
-
-
-Made with ❤️ By: https://t.me/powerurlshortener';
-Now, go ahead and try it out!**';
-➕ Hit 👉 /add_footer To Get Help About Adding your Custom Footer to bot.
-➕ Hit 👉 /add_header To Get Help About Adding your Custom Footer to bot.
-➕ Hit 👉 /balance To Get Help About Adding to bot
-➕ Hit 👉 /set_channel To Get Help About Adding to bot
-
-🔥 Now send me any message or post containing links and I’ll shorten them for you!
-
-👨‍💻 Created by: https://t.me/namenainai
-
+  const welcomeMessage = `😇 Welcome Hello Dear, ${fullName}!\n\n🔗 PowerURLShortener Bot is here to help you shorten any valid URL easily.\n\nYou can use this bot to shorten URLs using the powerurlshortener.link api service.\n\nTo shorten a URL, just type or paste the URL directly in the chat, and the bot will provide you with the shortened URL.\n\nIf you haven't set your powerurlshortener API token yet, use the command:\n/api YOUR_powerurlshortener_API_TOKEN\n\nHow To Use Me 👇👇\n1. Go to powerurlshortener.link & complete your registration.\n2. Then copy your API Key from https://powerurlshortener.link/member/tools/api\n3. Add your API using /api <your_api>\n\n⚠️ You must have to send link with https:// or http://\n\n➕ /add_footer — Add a custom footer\n➕ /add_header — Add a custom header\n➕ /balance — Check your balance\n➕ /set_channel — Set auto-post channel\n\n👨‍💻 Created by: https://t.me/namenainai`;
   bot.sendMessage(chatId, welcomeMessage);
 });
 
-  bot.onText(/\/api (.+)/, (msg, match) => {
-
+bot.onText(/\/api (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   const newToken = match[1].trim();
   const oldToken = getUserToken(chatId);
-
   if (oldToken && oldToken === newToken) {
-    bot.sendMessage(chatId, 'ℹ️ This API token is already set.');
-
+    return bot.sendMessage(chatId, 'ℹ️ This API token is already set.');
   }
-
   saveUserToken(chatId, newToken);
   bot.sendMessage(chatId, "✅ Your API token has been saved successfully.");
 });
@@ -267,101 +214,30 @@ bot.onText(/\/my_channel/, (msg) => {
   }
 });
 
-bot.on('message', async (msg) => {
-  const chatId = msg.chat.id;
-  if (msg.text && msg.text.startsWith('/')) return;
-
-  const text = msg.text || msg.caption || '';
-  const links = extractLinks(text);
-
-  if (links.length > 0) {
-    const shortenedLinks = await shortenMultipleLinks(chatId, links);
-    const updatedText = replaceLinksInText(text, links, shortenedLinks);
-
-    const { header, footer } = getUserHeaderFooter(chatId);
-    const finalText = header + updatedText + footer;
-
-    if (msg.photo) {
-      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-      await bot.sendPhoto(chatId, photoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    } else if (msg.video) {
-      const videoFileId = msg.video.file_id;
-      await bot.sendVideo(chatId, videoFileId, {
-        caption: finalText,
-        reply_to_message_id: msg.message_id
-      });
-    } else {
-      await bot.sendMessage(chatId, finalText, {
-        reply_to_message_id: msg.message_id
-      });
-    }
-
-    const targetChannel = getUserChannel(chatId);
-    if (targetChannel) {
-      try {
-        await bot.sendMessage(targetChannel, finalText);
-      } catch (err) {
-        console.error(`Error sending to channel: ${err.message}`);
-        bot.sendMessage(chatId, '⚠️ Failed to send to your channel/group. Please check bot permissions.');
-      }
-    }
-
-    return;
-  }
-
-  if (msg.photo) {
-    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
-    await bot.sendPhoto(chatId, photoFileId, {
-      caption: text,
-      reply_to_message_id: msg.message_id
-    });
-  } else if (msg.video) {
-    const videoFileId = msg.video.file_id;
-    await bot.sendVideo(chatId, videoFileId, {
-      caption: text,
-      reply_to_message_id: msg.message_id
-    });
-  } else if (msg.text) {
-    await bot.sendMessage(chatId, msg.text, {
-      reply_to_message_id: msg.message_id
-    });
-  }
-});
-// /balance command
 bot.onText(/\/balance/, async (msg) => {
   const chatId = msg.chat.id;
   const userToken = getUserToken(chatId);
-
   if (!userToken) {
     return bot.sendMessage(chatId, '⚠️ Please set your API token first using:\n/api YOUR_TOKEN');
   }
-
   try {
     const apiUrl = `https://powerurlshortener.link/api?api=${userToken}&action=userinfo`;
     const response = await axios.get(apiUrl);
     const data = response.data;
-
     if (data.status === 'success') {
       const balance = data.balance || 'N/A';
       const clicks = data.clicks || 'N/A';
       const totalUrls = data.shortened_urls || 'N/A';
-
       const message = `💰 *Your Balance Info*\n\n` +
                       `🔗 Remaining Balance: *${balance}*\n` +
                       `👁️ Total Clicks: *${clicks}*\n` +
                       `📄 Total Shortened URLs: *${totalUrls}*`;
-
       bot.sendMessage(chatId, message, { parse_mode: 'Markdown' });
     } else {
       bot.sendMessage(chatId, '❌ Could not fetch balance. Please check your API token.');
     }
-
   } catch (err) {
     console.error(err.message);
     bot.sendMessage(chatId, '🚫 Error fetching balance. Please try again later.');
   }
 });
-
