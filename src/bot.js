@@ -256,3 +256,66 @@ bot.onText(/\/balance/, async (msg) => {
     bot.sendMessage(chatId, '🚫 Error fetching balance. Please try again later.');
   }
 });
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  if (msg.text && msg.text.startsWith('/')) return;
+
+  const text = msg.text || msg.caption || '';
+  const links = extractLinks(text);
+
+  if (links.length > 0) {
+    const shortenedLinks = await shortenMultipleLinks(chatId, links);
+    const updatedText = replaceLinksInText(text, links, shortenedLinks);
+
+    const { header, footer } = getUserHeaderFooter(chatId);
+    const finalText = header + updatedText + footer;
+
+    if (msg.photo) {
+      const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+      await bot.sendPhoto(chatId, photoFileId, {
+        caption: finalText,
+        reply_to_message_id: msg.message_id
+      });
+    } else if (msg.video) {
+      const videoFileId = msg.video.file_id;
+      await bot.sendVideo(chatId, videoFileId, {
+        caption: finalText,
+        reply_to_message_id: msg.message_id
+      });
+    } else {
+      await bot.sendMessage(chatId, finalText, {
+        reply_to_message_id: msg.message_id
+      });
+    }
+
+    const targetChannel = getUserChannel(chatId);
+    if (targetChannel) {
+      try {
+        await bot.sendMessage(targetChannel, finalText);
+      } catch (err) {
+        console.error(`Error sending to channel: ${err.message}`);
+        bot.sendMessage(chatId, '⚠️ Failed to send to your channel/group. Please check bot permissions.');
+      }
+    }
+
+    return;
+  }
+
+  if (msg.photo) {
+    const photoFileId = msg.photo[msg.photo.length - 1].file_id;
+    await bot.sendPhoto(chatId, photoFileId, {
+      caption: text,
+      reply_to_message_id: msg.message_id
+    });
+  } else if (msg.video) {
+    const videoFileId = msg.video.file_id;
+    await bot.sendVideo(chatId, videoFileId, {
+      caption: text,
+      reply_to_message_id: msg.message_id
+    });
+  } else if (msg.text) {
+    await bot.sendMessage(chatId, msg.text, {
+      reply_to_message_id: msg.message_id
+    });
+  }
+});
