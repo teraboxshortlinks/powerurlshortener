@@ -5,9 +5,9 @@ const express = require('express');
 const path = require('path');
 const app = express();
 
-// --- Express server (for uptime check)
+// --- Express Server for uptime check ---
 app.get('/', (req, res) => {
-  res.send('Hello World!');
+  res.send('✅ Bot is running...');
 });
 
 const port = 8080;
@@ -15,22 +15,22 @@ app.listen(port, () => {
   console.log(`Server running at http://localhost:${port}`);
 });
 
-// --- Telegram Bot Token from Environment Variable
+// --- Load Telegram Bot Token from Environment Variable ---
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!botToken) {
-  console.error('Error: TELEGRAM_BOT_TOKEN environment variable not set');
+  console.error('❌ TELEGRAM_BOT_TOKEN environment variable not set.');
   process.exit(1);
 }
 
-// --- Telegram Bot Instance
+// --- Initialize Telegram Bot ---
 const bot = new TelegramBot(botToken, { polling: true });
 
-// --- Database File Setup
+// --- Database Setup ---
 const dbPath = path.join(__dirname, 'src', 'database.json');
 if (!fs.existsSync(path.dirname(dbPath))) fs.mkdirSync(path.dirname(dbPath));
 if (!fs.existsSync(dbPath)) fs.writeFileSync(dbPath, '{}');
 
-// --- Database Functions
+// --- Token Storage Functions ---
 function getDatabaseData() {
   try {
     return JSON.parse(fs.readFileSync(dbPath, 'utf8'));
@@ -50,7 +50,7 @@ function getUserToken(chatId) {
   return dbData[chatId];
 }
 
-// --- URL Extract & Replace Functions
+// --- URL Detection & Replacement ---
 function extractLinks(text) {
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
   return [...text.matchAll(urlRegex)].map(match => match[0]);
@@ -64,11 +64,11 @@ function replaceLinksInText(text, originalLinks, shortenedLinks) {
   return updatedText;
 }
 
-// --- URL Shortener
+// --- Shorten Single URL ---
 async function shortenUrl(chatId, url) {
   const userToken = getUserToken(chatId);
   if (!userToken) {
-    bot.sendMessage(chatId, '⚠️ Please set your powerurlshortener.link API token first:\n/api YOUR_TOKEN');
+    bot.sendMessage(chatId, '⚠️ You have not set your API token.\nPlease use:\n/api YOUR_API_TOKEN');
     return null;
   }
   try {
@@ -81,6 +81,7 @@ async function shortenUrl(chatId, url) {
   }
 }
 
+// --- Shorten Multiple URLs ---
 async function shortenMultipleLinks(chatId, links) {
   const shortenedLinks = [];
   for (const link of links) {
@@ -90,46 +91,53 @@ async function shortenMultipleLinks(chatId, links) {
   return shortenedLinks;
 }
 
-// --- Telegram Bot Handlers ---
+// --- Bot Commands & Message Handlers ---
+
 // /start command
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   const username = msg.from.username || 'User';
 
   const welcomeMessage = `😇 Hello, ${username}!\n\n`
-    + 'Welcome to the powerurlshortener.link URL Shortener Bot!\n\n'
-    + 'This bot allows you to shorten URLs easily.\n'
-    + 'If you haven\'t set your API token yet, use:\n/api YOUR_API_TOKEN\n\n'
-    + 'How to use:\n'
-    + '1. Register at powerurlshortener.link\n'
-    + '2. Copy your API key from: https://powerurlshortener.link/member/tools/api\n'
-    + '3. Use the command: /api YOUR_API_TOKEN\n\n'
-    + '⚠️ Make sure links start with https:// or http://\n\n'
-    + 'Made with ❤️ By: https://t.me/powerurlshortener\n'
-    + '**Now, try it out!**';
-
+    + '👋 Welcome to the PowerURLShortener Bot!\n\n'
+    + 'This bot lets you shorten any valid URL quickly and easily.\n\n'
+    + '📌 If you haven\'t set your API token yet:\n'
+    + '👉 Use this command:\n/api YOUR_API_TOKEN\n\n'
+    + '📝 To get your token:\n1. Register at https://powerurlshortener.link\n'
+    + '2. Go to: Member Area → Tools → API\n'
+    + '3. Copy your API token and use it with the command above\n\n'
+    + '⚠️ Make sure your links start with "http://" or "https://"\n\n'
+    + '❤️ Created by: https://t.me/powerurlshortener\n\n'
+    + '🚀 Now send me a link to shorten it!';
+  
   bot.sendMessage(chatId, welcomeMessage);
 });
 
 // /api command
 bot.onText(/\/api (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
-  const userToken = match[1].trim();
+  const newToken = match[1].trim();
+  const oldToken = getUserToken(chatId);
 
-  saveUserToken(chatId, userToken);
-  bot.sendMessage(chatId, `✅ Your API token has been set successfully:\n${userToken}`);
+  if (oldToken && oldToken === newToken) {
+    bot.sendMessage(chatId, `ℹ️ This API token is already set.`);
+    return;
+  }
+
+  saveUserToken(chatId, newToken);
+  bot.sendMessage(chatId, `✅ Your API token has been saved successfully.`);
 });
 
-// --- Handle All Messages ---
+// Handle general messages
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-  // Skip command messages
+  // Ignore bot commands
   if (msg.text && (msg.text.startsWith('/api') || msg.text.startsWith('/start'))) return;
 
   const isForwarded = msg.forward_from || msg.forward_from_chat;
 
-  // --- Case 1: Forwarded Photo + Caption ---
+  // Case 1: Forwarded photo with caption
   if (isForwarded && msg.photo) {
     const caption = msg.caption || '';
     const links = extractLinks(caption);
@@ -137,7 +145,6 @@ bot.on('message', async (msg) => {
     if (links.length > 0) {
       const shortenedLinks = await shortenMultipleLinks(chatId, links);
       const updatedCaption = replaceLinksInText(caption, links, shortenedLinks);
-
       const photoFileId = msg.photo[msg.photo.length - 1].file_id;
       await bot.sendPhoto(chatId, photoFileId, {
         caption: updatedCaption,
@@ -153,7 +160,7 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // --- Case 2: Forwarded Text only ---
+  // Case 2: Forwarded text only
   if (isForwarded && msg.text) {
     const links = extractLinks(msg.text);
     if (links.length > 0) {
@@ -166,7 +173,7 @@ bot.on('message', async (msg) => {
     return;
   }
 
-  // --- Case 3: Normal Message (Text + Photo) ---
+  // Case 3: Normal message (text or caption)
   const text = msg.text || msg.caption || '';
   const links = extractLinks(text);
 
@@ -181,7 +188,10 @@ bot.on('message', async (msg) => {
         reply_to_message_id: msg.message_id
       });
     } else {
-      await bot.sendMessage(chatId, updatedText, { reply_to_message_id: msg.message_id });
+      await bot.sendMessage(chatId, updatedText, {
+        reply_to_message_id: msg.message_id,
+        disable_web_page_preview: true
+      });
     }
   }
 });
