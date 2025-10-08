@@ -131,7 +131,7 @@ function getUserHeaderFooter(chatId) {
   const header = getFromDatabase(chatId, 'header') || '';
   const footer = getFromDatabase(chatId, 'footer') || '';
   return {
-    header: `${header ? header + '\n\n' : ''}`, // Add a newline only if a custom header exists.
+    header: `${header ? header + '' : ''}`, // Add a newline only if a custom header exists.
     footer: `${footer ? '\n' + footer : ''}\n\n✅ Powered by PowerURLShortener.link` // Add newline for custom footer, then the default.
   };
 }
