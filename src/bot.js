@@ -329,18 +329,36 @@ bot.onText(/\/api (.+)/, async (msg, match) => {
   await sendTelegramMessage(msg.chat.id, 'text', '✅ API token saved.', { isUserChat: true });
 });
 
-// Handles the /add_header command to set custom header text.
-bot.onText(/\/add_header (.+)/, async (msg, match) => {
-  saveToDatabase(msg.chat.id, 'header', match[1].trim()); // Save the header text.
-  await sendTelegramMessage(msg.chat.id, 'text', '✅ Header saved.', { isUserChat: true });
-});
+@bot.message_handler(commands=['add_header'])
+def add_header(message):
+    user_id = str(message.from_user.id)
+    header_text = message.text.replace("/add_header", "").strip()
+    if not header_text:
+        bot.reply_to(message, "✍️ Please enter header text after /add_header")
+        return
+    # ✅ No auto short link in header text
+    data = load_data()
+    if user_id not in data:
+        data[user_id] = {}
+    data[user_id]["header"] = header_text
+    save_data(data)
+    bot.reply_to(message, f"✅ Header saved (link not shortened):\n\n{header_text}")
 
-// Handles the /add_footer command to set custom footer text.
-bot.onText(/\/add_footer (.+)/, async (msg, match) => {
-  saveToDatabase(msg.chat.id, 'footer', match[1].trim()); // Save the footer text.
-  await sendTelegramMessage(msg.chat.id, 'text', '✅ Footer saved.', { isUserChat: true });
-});
 
+@bot.message_handler(commands=['add_footer'])
+def add_footer(message):
+    user_id = str(message.from_user.id)
+    footer_text = message.text.replace("/add_footer", "").strip()
+    if not footer_text:
+        bot.reply_to(message, "✍️ Please enter footer text after /add_footer")
+        return
+    # ✅ No auto short link in footer text
+    data = load_data()
+    if user_id not in data:
+        data[user_id] = {}
+    data[user_id]["footer"] = footer_text
+    save_data(data)
+    bot.reply_to(message, f"✅ Footer saved (link not shortened):\n\n{footer_text}")
 // Handles the /set_channel command to configure the auto-post channel.
 // MODIFIED: Now supports both public (@username) and private (+invite_hash) Telegram channel links.
 bot.onText(/\/set_channel (.+)/, async (msg, match) => {
