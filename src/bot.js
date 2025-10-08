@@ -329,39 +329,29 @@ bot.onText(/\/api (.+)/, async (msg, match) => {
   await sendTelegramMessage(msg.chat.id, 'text', '✅ API token saved.', { isUserChat: true });
 });
 
-@bot.message_handler(commands=['add_header'])
-def add_header(message):
-    user_id = str(message.from_user.id)
-    header_text = message.text.replace("/add_header", "").strip()
-    if not header_text:
-        bot.reply_to(message, "✍️ Please enter header text after /add_header")
-        return
-    # 🚫 DO NOT shorten any link — even Markdown links
-    data = load_data()
-    if user_id not in data:
-        data[user_id] = {}
-    data[user_id]["header"] = header_text
-    save_data(data)
-    bot.reply_to(message, "✅ Header saved (links kept original, Markdown supported):\n\n"
-                          f"{header_text}", parse_mode="Markdown")
+// Handles the /add_header command
+bot.onText(/\/add_header (.+)/, async (msg, match) => {
+  const headerText = match[1].trim();
+  if (!headerText) {
+    return await sendTelegramMessage(msg.chat.id, 'text', '✍️ Please enter header text after /add_header', { isUserChat: true });
+  }
 
+  // 🚫 DO NOT shorten links — even Markdown links
+  saveToDatabase(msg.chat.id, 'header', headerText);
+  await sendTelegramMessage(msg.chat.id, 'text', `✅ Header saved (links kept original, Markdown supported):\n\n${headerText}`, { isUserChat: true });
+});
 
-@bot.message_handler(commands=['add_footer'])
-def add_footer(message):
-    user_id = str(message.from_user.id)
-    footer_text = message.text.replace("/add_footer", "").strip()
-    if not footer_text:
-        bot.reply_to(message, "✍️ Please enter footer text after /add_footer")
-        return
-    # 🚫 DO NOT shorten any link — even Markdown links
-    data = load_data()
-    if user_id not in data:
-        data[user_id] = {}
-    data[user_id]["footer"] = footer_text
-    save_data(data)
-    bot.reply_to(message, "✅ Footer saved (links kept original, Markdown supported):\n\n"
-                          f"{footer_text}", parse_mode="Markdown")
+// Handles the /add_footer command
+bot.onText(/\/add_footer (.+)/, async (msg, match) => {
+  const footerText = match[1].trim();
+  if (!footerText) {
+    return await sendTelegramMessage(msg.chat.id, 'text', '✍️ Please enter footer text after /add_footer', { isUserChat: true });
+  }
 
+  // 🚫 DO NOT shorten links — even Markdown links
+  saveToDatabase(msg.chat.id, 'footer', footerText);
+  await sendTelegramMessage(msg.chat.id, 'text', `✅ Footer saved (links kept original, Markdown supported):\n\n${footerText}`, { isUserChat: true });
+});
 // Handles the /set_channel command to configure the auto-post channel.
 // MODIFIED: Now supports both public (@username) and private (+invite_hash) Telegram channel links.
 bot.onText(/\/set_channel (.+)/, async (msg, match) => {
