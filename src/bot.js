@@ -336,13 +336,14 @@ def add_header(message):
     if not header_text:
         bot.reply_to(message, "✍️ Please enter header text after /add_header")
         return
-    # ✅ No auto short link in header text
+    # 🚫 DO NOT shorten any link — even Markdown links
     data = load_data()
     if user_id not in data:
         data[user_id] = {}
     data[user_id]["header"] = header_text
     save_data(data)
-    bot.reply_to(message, f"✅ Header saved (link not shortened):\n\n{header_text}")
+    bot.reply_to(message, "✅ Header saved (links kept original, Markdown supported):\n\n"
+                          f"{header_text}", parse_mode="Markdown")
 
 
 @bot.message_handler(commands=['add_footer'])
@@ -352,13 +353,15 @@ def add_footer(message):
     if not footer_text:
         bot.reply_to(message, "✍️ Please enter footer text after /add_footer")
         return
-    # ✅ No auto short link in footer text
+    # 🚫 DO NOT shorten any link — even Markdown links
     data = load_data()
     if user_id not in data:
         data[user_id] = {}
     data[user_id]["footer"] = footer_text
     save_data(data)
-    bot.reply_to(message, f"✅ Footer saved (link not shortened):\n\n{footer_text}")
+    bot.reply_to(message, "✅ Footer saved (links kept original, Markdown supported):\n\n"
+                          f"{footer_text}", parse_mode="Markdown")
+
 // Handles the /set_channel command to configure the auto-post channel.
 // MODIFIED: Now supports both public (@username) and private (+invite_hash) Telegram channel links.
 bot.onText(/\/set_channel (.+)/, async (msg, match) => {
