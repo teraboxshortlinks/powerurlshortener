@@ -131,8 +131,8 @@ function getUserHeaderFooter(chatId) {
   const header = getFromDatabase(chatId, 'header') || '';
   const footer = getFromDatabase(chatId, 'footer') || '';
   return {
-    header: `${header ? header + '' : ''}`, // Add a newline only if a custom header exists.
-    footer: `${footer ? '\n' + footer : ''}\n\n✅ Powered by PowerURLShortener.link` // Add newline for custom footer, then the default.
+    header: `${header ? header + '\n\n' : ''}`, // Add a newline only if a custom header exists.
+    footer: `${footer ? '\n' + footer : ''}\n\n\n\n✅ Powered by PowerURLShortener.link` // Add newline for custom footer, then the default.
   };
 }
 
@@ -328,27 +328,19 @@ bot.onText(/\/api (.+)/, async (msg, match) => {
   saveToDatabase(msg.chat.id, 'token', apiToken); // Save it to the database.
   await sendTelegramMessage(msg.chat.id, 'text', '✅ API token saved.', { isUserChat: true });
 });
-// --- Add Header Command ---
-bot.onText(/^\/add_header (.+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const headerText = match[1].trim();
 
-  // Save header as-is (no URL shortening)
-  saveToDatabase(chatId, 'header', headerText);
-
-  bot.sendMessage(chatId, `✅ Header saved successfully:\n\n${headerText}`);
+// Handles the /add_header command to set custom header text.
+bot.onText(/\/add_header (.+)/, async (msg, match) => {
+  saveToDatabase(msg.chat.id, 'header', match[1].trim()); // Save the header text.
+  await sendTelegramMessage(msg.chat.id, 'text', '✅ Header saved.', { isUserChat: true });
 });
 
-// --- Add Footer Command ---
-bot.onText(/^\/add_footer (.+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
-  const footerText = match[1].trim();
-
-  // Save footer as-is (no URL shortening)
-  saveToDatabase(chatId, 'footer', footerText);
-
-  bot.sendMessage(chatId, `✅ Footer saved successfully:\n\n${footerText}`);
+// Handles the /add_footer command to set custom footer text.
+bot.onText(/\/add_footer (.+)/, async (msg, match) => {
+  saveToDatabase(msg.chat.id, 'footer', match[1].trim()); // Save the footer text.
+  await sendTelegramMessage(msg.chat.id, 'text', '✅ Footer saved.', { isUserChat: true });
 });
+
 // Handles the /set_channel command to configure the auto-post channel.
 // MODIFIED: Now supports both public (@username) and private (+invite_hash) Telegram channel links.
 bot.onText(/\/set_channel (.+)/, async (msg, match) => {
@@ -436,12 +428,10 @@ bot.on('message', async (msg) => {
 
   // --- Pre-processing & Early Exits ---
   // Ignore messages that are clearly commands (start with / and no spaces) to prevent re-processing.
-  // Exception: allow the `/api` command itself to go through, as its arguments are processed here.
-  if (msg.text && msg.text.startsWith('/') && !msg.text.startsWith('/api') && msg.text.length > 1 && !msg.text.includes(' ')) {
+  if (msg.text && msg.text.startsWith('/') && msg.text.length > 1 && !msg.text.includes(' ')) {
       return;
   }
 
-  const { header, footer } = getUserHeaderFooter(chatId); // Get user's custom header and footer.
   // Check if the message was forwarded (from a user or another chat/channel).
   const isForwarded = msg.forward_from || msg.forward_from_chat;
   const autoPostChannel = getFromDatabase(chatId, 'channel'); // Get the user's configured auto-post channel.
@@ -475,66 +465,69 @@ bot.on('message', async (msg) => {
           const shortened = await shortenMultipleLinks(chatId, links);
           updatedCaption = await replaceLinksInText(caption, links, shortened);
         }
-
+        
+        // **FIX:** Get header/footer AFTER processing links in the main content.
+        const { header, footer } = getUserHeaderFooter(chatId);
         const finalCaption = `${header}${updatedCaption}${footer}`;
 
         // Prepare the media array for `bot.sendMediaGroup`.
-        // Each item needs 'type', 'media' (file_id), and an optional 'caption' (only for the first item).
         const media = group.map((m, i) => {
             let mediaType = '';
             let fileId = '';
             if (m.photo) {
                 mediaType = 'photo';
-                fileId = m.photo[m.photo.length - 1].file_id; // Get the file_id for the highest quality photo.
+                fileId = m.photo[m.photo.length - 1].file_id;
             } else if (m.video) {
                 mediaType = 'video';
                 fileId = m.video.file_id;
             } else {
-                return null; // Skip unsupported media types within the group (e.g., text-only messages in a mixed group).
+                return null;
             }
 
             return {
                 type: mediaType,
                 media: fileId,
-                caption: i === 0 ? finalCaption : undefined // Only the very first item in the group gets the combined caption.
+                caption: i === 0 ? finalCaption : undefined
             };
-        }).filter(Boolean); // Remove any null entries resulting from unsupported media types.
+        }).filter(Boolean);
 
         if (media.length > 0) {
-            // Send the media group back to the user's chat, replying to the original first message of the group.
             await sendTelegramMessage(chatId, 'mediaGroup', media, { reply_to_message_id: group[0].message_id, isUserChat: true });
-            // If an auto-post channel is set, send the media group there too.
             if (autoPostChannel) {
                 await sendTelegramMessage(autoPostChannel, 'mediaGroup', media);
             }
         }
-      }, 500); // 500ms delay to allow all parts of the media group to arrive.
+      }, 500);
     }
-    mediaGroups[groupId].push(msg); // Add the current message part to its respective media group.
-    return; // Stop further processing for this message, as it's part of a group that will be handled by the timeout.
+    mediaGroups[groupId].push(msg);
+    return;
   }
 
   // --- Handle Forwarded Single Photos and Videos ---
-  // If a message is forwarded AND contains a photo...
   if (isForwarded && msg.photo) {
     const caption = msg.caption || '';
     const links = extractLinks(caption);
     const shortened = await shortenMultipleLinks(chatId, links);
     const updated = await replaceLinksInText(caption, links, shortened);
+    
+    // **FIX:** Get header/footer AFTER processing links in the main content.
+    const { header, footer } = getUserHeaderFooter(chatId);
     const finalCaption = `${header}${updated}${footer}`;
-    const photoId = msg.photo[msg.photo.length - 1].file_id; // Get highest quality photo ID.
+    const photoId = msg.photo[msg.photo.length - 1].file_id;
 
     await sendTelegramMessage(chatId, 'photo', photoId, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
     if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'photo', photoId, { caption: finalCaption });
     return;
   }
 
-  // If a message is forwarded AND contains a video...
   if (isForwarded && msg.video) {
     const caption = msg.caption || '';
     const links = extractLinks(caption);
     const shortened = await shortenMultipleLinks(chatId, links);
     const updated = await replaceLinksInText(caption, links, shortened);
+
+    // **FIX:** Get header/footer AFTER processing links in the main content.
+    const { header, footer } = getUserHeaderFooter(chatId);
     const finalCaption = `${header}${updated}${footer}`;
 
     await sendTelegramMessage(chatId, 'video', msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
@@ -543,39 +536,32 @@ bot.on('message', async (msg) => {
   }
 
   // --- Handle Normal Messages (text, photo with caption, video with caption) ---
-  // Get the content, which could be plain text or a caption of a photo/video.
   const content = msg.text || msg.caption || '';
-  const links = extractLinks(content); // Extract any URLs from the content.
+  const links = extractLinks(content);
+  
+  // **FIX:** Get header/footer AFTER processing links in the main content.
+  const { header, footer } = getUserHeaderFooter(chatId);
 
   if (links.length > 0) {
-    // If URLs are found, proceed with shortening.
     const shortened = await shortenMultipleLinks(chatId, links);
     const updatedContent = await replaceLinksInText(content, links, shortened);
     const finalContentWithHeaderFooter = `${header}${updatedContent}${footer}`;
 
     if (msg.photo) {
-      // If the message is a photo with a caption containing links.
       const photoId = msg.photo[msg.photo.length - 1].file_id;
       await sendTelegramMessage(chatId, 'photo', photoId, { caption: finalContentWithHeaderFooter, reply_to_message_id: msg.message_id, isUserChat: true });
       if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'photo', photoId, { caption: finalContentWithHeaderFooter });
     } else if (msg.video) {
-      // If the message is a video with a caption containing links.
       await sendTelegramMessage(chatId, 'video', msg.video.file_id, { caption: finalContentWithHeaderFooter, reply_to_message_id: msg.message_id, isUserChat: true });
       if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'video', msg.video.file_id, { caption: finalContentWithHeaderFooter });
     } else {
-      // If it's a plain text message containing links.
       await sendTelegramMessage(chatId, 'text', finalContentWithHeaderFooter, { reply_to_message_id: msg.message_id, isUserChat: true });
       if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'text', finalContentWithHeaderFooter);
     }
   } else if (msg.text && !msg.text.startsWith('/')) {
-    // This block handles plain text messages that *do not* contain links
-    // and are *not* Telegram commands.
     const rawText = msg.text;
     const finalContentWithHeaderFooter = `${header}${rawText}${footer}`;
 
-    // Only send the message if the content was actually modified by a header/footer
-    // OR if the original message text was not empty (to avoid sending empty replies).
-    // This prevents the bot from replying to every single non-command text message if no headers/footers are set.
     if (finalContentWithHeaderFooter.trim() !== rawText.trim() || rawText.trim() !== '') {
         await sendTelegramMessage(chatId, 'text', finalContentWithHeaderFooter, { reply_to_message_id: msg.message_id, isUserChat: true });
         if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'text', finalContentWithHeaderFooter);
@@ -584,3 +570,4 @@ bot.on('message', async (msg) => {
 });
 
 console.log('Bot is running and listening for messages...');
+```
