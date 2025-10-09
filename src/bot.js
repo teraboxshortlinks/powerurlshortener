@@ -328,29 +328,26 @@ bot.onText(/\/api (.+)/, async (msg, match) => {
   saveToDatabase(msg.chat.id, 'token', apiToken); // Save it to the database.
   await sendTelegramMessage(msg.chat.id, 'text', '✅ API token saved.', { isUserChat: true });
 });
-
-// Handles the /add_header command
-bot.onText(/\/add_header (.+)/, async (msg, match) => {
+// --- Add Header Command ---
+bot.onText(/^\/add_header (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
   const headerText = match[1].trim();
-  if (!headerText) {
-    return await sendTelegramMessage(msg.chat.id, 'text', '✍️ Please enter header text after /add_header', { isUserChat: true });
-  }
 
-  // 🚫 DO NOT shorten links — even Markdown links
-  saveToDatabase(msg.chat.id, 'header', headerText);
-  await sendTelegramMessage(msg.chat.id, 'text', `✅ Header saved (links kept original, Markdown supported):\n\n${headerText}`, { isUserChat: true });
+  // Save header as-is (no URL shortening)
+  saveToDatabase(chatId, 'header', headerText);
+
+  bot.sendMessage(chatId, `✅ Header saved successfully:\n\n${headerText}`);
 });
 
-// Handles the /add_footer command
-bot.onText(/\/add_footer (.+)/, async (msg, match) => {
+// --- Add Footer Command ---
+bot.onText(/^\/add_footer (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
   const footerText = match[1].trim();
-  if (!footerText) {
-    return await sendTelegramMessage(msg.chat.id, 'text', '✍️ Please enter footer text after /add_footer', { isUserChat: true });
-  }
 
-  // 🚫 DO NOT shorten links — even Markdown links
-  saveToDatabase(msg.chat.id, 'footer', footerText);
-  await sendTelegramMessage(msg.chat.id, 'text', `✅ Footer saved (links kept original, Markdown supported):\n\n${footerText}`, { isUserChat: true });
+  // Save footer as-is (no URL shortening)
+  saveToDatabase(chatId, 'footer', footerText);
+
+  bot.sendMessage(chatId, `✅ Footer saved successfully:\n\n${footerText}`);
 });
 // Handles the /set_channel command to configure the auto-post channel.
 // MODIFIED: Now supports both public (@username) and private (+invite_hash) Telegram channel links.
