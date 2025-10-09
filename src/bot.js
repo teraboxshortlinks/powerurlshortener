@@ -11,31 +11,22 @@ const path = require('path');
 const app = express();
 
 // --- Web Server Setup ---
-// Basic web server for deployment purposes (e.g., to keep Heroku/Render awake)
 app.get('/', (req, res) => {
   res.send('Hello World! Bot is running.');
 });
-
-// Use PORT environment variable provided by hosting platforms (like Heroku, Railway, Render)
-// or default to 8080 for local development.
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
 
 // --- Telegram Bot Setup ---
-// The bot token MUST be set as an environment variable for security and deployment best practices.
-// Example: export TELEGRAM_BOT_TOKEN="YOUR_ACTUAL_BOT_TOKEN_HERE"
 const botToken = process.env.TELEGRAM_BOT_TOKEN;
 if (!botToken) {
   console.error('Error: TELEGRAM_BOT_TOKEN environment variable is not set.');
-  console.error('Please set it with your Telegram bot API token (e.g., `export TELEGRAM_BOT_TOKEN="YOUR_TOKEN_HERE"`) before running the bot.');
-  process.exit(1); // Exit the process if the token is missing, as the bot can't function.
+  process.exit(1);
 }
+const bot = new TelegramBot(botToken, { polling: true });
 
-const bot = new TelegramBot(botToken, { polling: true }); // Enable polling to receive updates
-
-// Set bot commands that appear in Telegram's command menu
 bot.setMyCommands([
   { command: 'start', description: 'Show welcome message and instructions' },
   { command: 'api', description: 'Set your PowerURLShortener API token (/api YOUR_TOKEN)' },
@@ -48,67 +39,38 @@ bot.setMyCommands([
 ]);
 
 // --- Database Configuration and Functions ---
-// Path to the JSON database file. It's placed in a 'src' subdirectory.
 const dbPath = path.join(__dirname, 'src', 'database.json');
-
-// Ensure the 'src' directory exists. If not, create it recursively.
 if (!fs.existsSync(path.dirname(dbPath))) {
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 }
-// Create the database file with an empty JSON object if it doesn't exist.
 if (!fs.existsSync(dbPath)) {
   fs.writeFileSync(dbPath, '{}');
 }
 
-/**
- * Reads and parses the database JSON file.
- * Handles potential errors during file reading or JSON parsing.
- * @returns {Object} The database object, or an empty object if an error occurs.
- */
 function getDatabaseData() {
   try {
     const data = fs.readFileSync(dbPath, 'utf8');
     return JSON.parse(data);
   } catch (error) {
     console.error('Error reading database:', error.message);
-    return {}; // Return an empty object on error to prevent application crashes.
+    return {};
   }
 }
 
-/**
- * Saves a key-value pair for a specific chat ID to the database.
- * Creates the user's data entry if it doesn't exist.
- * @param {number} chatId - The unique ID of the Telegram chat.
- * @param {string} key - The key to store (e.g., 'token', 'header', 'channel').
- * @param {any} value - The value to be stored.
- */
 function saveToDatabase(chatId, key, value) {
   const db = getDatabaseData();
   if (!db[chatId]) {
-    db[chatId] = {}; // Initialize user's data if it doesn't exist.
+    db[chatId] = {};
   }
   db[chatId][key] = value;
-  // Write the updated database back to the file, formatted for readability (2-space indentation).
   fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
 }
 
-/**
- * Retrieves a value associated with a specific chat ID and key from the database.
- * @param {number} chatId - The unique ID of the Telegram chat.
- * @param {string} key - The key whose value is to be retrieved.
- * @returns {any|undefined} The stored value, or `undefined` if the chat ID or key is not found.
- */
 function getFromDatabase(chatId, key) {
   const db = getDatabaseData();
-  return db[chatId]?.[key]; // Uses optional chaining for safe access.
+  return db[chatId]?.[key];
 }
 
-/**
- * Deletes a specific key-value pair for a given chat ID from the database.
- * @param {number} chatId - The unique ID of the Telegram chat.
- * @param {string} key - The key to be deleted.
- * @returns {boolean} `true` if the key was deleted, `false` if it wasn't found.
- */
 function deleteFromDatabase(chatId, key) {
   const db = getDatabaseData();
   if (db[chatId] && db[chatId][key]) {
@@ -120,48 +82,25 @@ function deleteFromDatabase(chatId, key) {
 }
 
 // --- Header/Footer and Link Processing Utilities ---
-
-/**
- * Retrieves the user's custom header and footer text.
- * Includes a default "Powered by" footer.
- * @param {number} chatId - The ID of the chat to retrieve settings for.
- * @returns {{header: string, footer: string}} An object containing the formatted header and footer strings.
- */
 function getUserHeaderFooter(chatId) {
   const header = getFromDatabase(chatId, 'header') || '';
   const footer = getFromDatabase(chatId, 'footer') || '';
   return {
-    header: `${header ? header + '\n\n' : ''}`, // Add a newline only if a custom header exists.
-    footer: `${footer ? '\n' + footer : ''}\n\n\n\n✅ Powered by PowerURLShortener.link` // Add newline for custom footer, then the default.
+    header: `${header ? header + '\n\n' : ''}`,
+    footer: `${footer ? '\n' + footer : ''}\n\n\n\n✅ Powered by PowerURLShortener.link`
   };
 }
 
-/**
- * Extracts all valid URLs (http/https or www.) from a given text.
- * @param {string} text - The input string to search for URLs.
- * @returns {string[]} An array of extracted URL strings.
- */
 function extractLinks(text) {
-  // Regex to match URLs starting with http(s):// or www.
   const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
-  return [...text.matchAll(urlRegex)].map(match => match[0]);
+  const matches = text.match(urlRegex);
+  return matches || [];
 }
 
-/**
- * Replaces original links in a text string with their shortened versions.
- * Ensures that if a link appears multiple times, all instances are replaced.
- * @param {string} originalText - The text containing original links.
- * @param {string[]} originalLinks - An array of the original URLs found in `originalText`.
- * @param {string[]} shortenedLinks - An array of the corresponding shortened URLs.
- * @returns {string} The text with all original links replaced by their shortened versions.
- */
 async function replaceLinksInText(originalText, originalLinks, shortenedLinks) {
   let replacedText = originalText;
   originalLinks.forEach((link, index) => {
-    // Only replace if a valid shortened URL exists for the current index.
     if (shortenedLinks[index]) {
-      // Create a global regular expression to replace ALL occurrences of the link.
-      // `escapeRegExp` is crucial to handle special characters in URLs (e.g., periods, slashes).
       const regex = new RegExp(escapeRegExp(link), 'g');
       replacedText = replacedText.replace(regex, shortenedLinks[index]);
     }
@@ -169,122 +108,50 @@ async function replaceLinksInText(originalText, originalLinks, shortenedLinks) {
   return replacedText;
 }
 
-/**
- * Escapes special characters in a string so it can be safely used within a RegExp constructor.
- * This prevents errors if the URL contains characters like '.', '+', '?', etc.
- * @param {string} string - The string to escape.
- * @returns {string} The escaped string, safe for RegExp.
- */
 function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-/**
- * Shortens a single URL by making an API call to PowerURLShortener.
- * Handles cases where the API token is missing or if the API call fails.
- * @param {number} chatId - The ID of the chat (used to retrieve the user's API token).
- * @param {string} url - The URL string to be shortened.
- * @returns {Promise<string|null>} A promise that resolves to the shortened URL, or the original URL if shortening fails.
- * Returns `null` if no API token is set for the user.
- */
 async function shortenUrl(chatId, url) {
   const token = getFromDatabase(chatId, 'token');
-  if (!token) {
-    // If no token, we can't shorten. The main message handler will inform the user.
-    return null;
-  }
+  if (!token) return null;
   try {
     const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&url=${encodeURIComponent(url)}`);
-    // The PowerURLShortener API can return the shortened URL in different keys.
-    // Prioritize 'shortenedUrl', then 'shortened', then 'short', finally fallback to original URL.
     return res.data.shortenedUrl || res.data.shortened || res.data.short || url;
   } catch (err) {
-    console.error(`Error shortening URL "${url}" for chat ${chatId}:`, err.message);
-    // Log more details if it's an HTTP error response from the API.
-    if (err.response) {
-      console.error(`API Error Response: Status ${err.response.status}, Data:`, err.response.data);
-    }
-    return url; // Return original URL on any shortening error.
+    console.error(`Error shortening URL "${url}":`, err.message);
+    return url;
   }
 }
 
-/**
- * Shortens multiple URLs concurrently using `Promise.all`.
- * This is more efficient than shortening them one by one.
- * @param {number} chatId - The ID of the chat.
- * @param {string[]} links - An array of URLs to shorten.
- * @returns {Promise<string[]>} A promise that resolves to an array of shortened URLs.
- * If a URL fails to shorten, its original form is returned in its place.
- */
 async function shortenMultipleLinks(chatId, links) {
   const promises = links.map(link => shortenUrl(chatId, link));
-  const results = await Promise.all(promises);
-  // Ensure an entry exists for each original link, even if shortening failed.
-  return results.map((shortened, index) => shortened || links[index]);
+  return await Promise.all(promises);
 }
 
 // --- Telegram Message Sending Utility ---
-
-/**
- * Generic function to send various types of Telegram messages with robust error handling.
- * This centralizes message sending logic and error reporting.
- * @param {number} chatId - The ID of the chat or channel to send the message to.
- * @param {string} type - The type of message to send ('text', 'photo', 'video', 'mediaGroup').
- * @param {string|string[]|Object[]} content - The content to send (e.g., text string, file_id, or array for mediaGroup).
- * @param {Object} [options={}] - Optional parameters for the Telegram API method (e.g., parse_mode, reply_to_message_id).
- * @param {boolean} [options.isUserChat=false] - A custom flag to indicate if the message is for the user's direct chat.
- * Used for specific error messages to the user.
- */
 async function sendTelegramMessage(chatId, type, content, options = {}) {
   try {
-    if (!chatId) {
-      console.warn(`Attempted to send message to undefined/null chatId. Type: ${type}, Content: ${JSON.stringify(content).substring(0, 100)}...`);
-      return;
-    }
-
+    if (!chatId) return;
     switch (type) {
-      case 'text':
-        await bot.sendMessage(chatId, content, options);
-        break;
-      case 'photo':
-        await bot.sendPhoto(chatId, content, options);
-        break;
-      case 'video':
-        await bot.sendVideo(chatId, content, options);
-        break;
-      case 'mediaGroup':
-        // For media groups, content should be an array of {type, media, caption}.
-        // The TelegramBot library handles `media` as file_id, URL, or Buffer.
-        await bot.sendMediaGroup(chatId, content, options);
-        break;
-      default:
-        console.warn(`Unknown message type: ${type} for chat ID ${chatId}.`);
-        break;
+      case 'text': await bot.sendMessage(chatId, content, options); break;
+      case 'photo': await bot.sendPhoto(chatId, content, options); break;
+      case 'video': await bot.sendVideo(chatId, content, options); break;
+      case 'mediaGroup': await bot.sendMediaGroup(chatId, content, options); break;
+      default: console.warn(`Unknown message type: ${type}`);
     }
-    // console.log(`Successfully sent ${type} to chat ${chatId}`); // Uncomment for detailed successful send logging.
   } catch (error) {
     console.error(`Failed to send ${type} to chat ID ${chatId}:`, error.message);
-    // Specific handling for 'chat not found' errors, which often occur with incorrect channel IDs
-    // or if the bot was kicked/blocked from a chat.
-    if (error.response && error.response.statusCode === 400 && error.response.body && error.response.body.description.includes('chat not found')) {
-      console.warn(`Error details: Chat ID ${chatId} not found. This might be due to an incorrect channel ID, the bot being blocked, or not being an admin.`);
-      // Only inform the user in their personal chat, not the channel (to avoid spamming error messages).
-      if (options.isUserChat) {
-        await bot.sendMessage(chatId, "⚠️ Sorry! I couldn't send the message to the specified chat/channel. Please ensure the ID is correct and I have the necessary permissions (e.g., admin rights to post messages).", { parse_mode: 'Markdown' });
-      }
-    } else {
-      // General error logging for other types of send failures.
-      console.error(`An unexpected error occurred while sending ${type} to chat ${chatId}:`, error);
+    if (options.isUserChat && error.response?.body?.description.includes('chat not found')) {
+      await bot.sendMessage(chatId, "⚠️ Sorry! I couldn't send the message to the specified channel. Please check the ID/username and my permissions.");
     }
   }
 }
 
 // --- Bot Command Handlers ---
-
-// Handles the /start command.
-bot.onText(/\/start/, async (msg) => {
-  const name = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim();
-  const welcomeText = `😇 *Welcome, ${name}!*
+bot.onText(/\/start/, (msg) => {
+    const name = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim();
+    const welcomeText = `😇 *Welcome, ${name}!*
 
 🔗 *PowerURLShortener Bot* helps you shorten any valid URL easily using the [powerurlshortener.link](https://powerurlshortener.link) API service.
 
@@ -318,256 +185,158 @@ To shorten a URL, just send it directly in the chat — the bot will return a sh
 
 🔗 *Made with ❤️ by:* [PowerURLShortener](https://t.me/powerurlshortener)
 👨‍💻 *Created by:* [@namenainai](https://t.me/namenainai)`;
-
-  await sendTelegramMessage(msg.chat.id, 'text', welcomeText, { parse_mode: 'Markdown', isUserChat: true });
+    sendTelegramMessage(msg.chat.id, 'text', welcomeText, { parse_mode: 'Markdown', isUserChat: true });
 });
 
-// Handles the /api command to set the user's API token.
-bot.onText(/\/api (.+)/, async (msg, match) => {
-  const apiToken = match[1].trim(); // Extract the API token from the command arguments.
-  saveToDatabase(msg.chat.id, 'token', apiToken); // Save it to the database.
-  await sendTelegramMessage(msg.chat.id, 'text', '✅ API token saved.', { isUserChat: true });
+bot.onText(/\/api (.+)/, (msg, match) => {
+  saveToDatabase(msg.chat.id, 'token', match[1].trim());
+  sendTelegramMessage(msg.chat.id, 'text', '✅ API token saved.', { isUserChat: true });
 });
 
-// Handles the /add_header command to set custom header text.
-bot.onText(/\/add_header (.+)/, async (msg, match) => {
-  saveToDatabase(msg.chat.id, 'header', match[1].trim()); // Save the header text.
-  await sendTelegramMessage(msg.chat.id, 'text', '✅ Header saved.', { isUserChat: true });
+bot.onText(/\/add_header (.+)/, (msg, match) => {
+  saveToDatabase(msg.chat.id, 'header', match[1].trim());
+  sendTelegramMessage(msg.chat.id, 'text', '✅ Header saved.', { isUserChat: true });
 });
 
-// Handles the /add_footer command to set custom footer text.
-bot.onText(/\/add_footer (.+)/, async (msg, match) => {
-  saveToDatabase(msg.chat.id, 'footer', match[1].trim()); // Save the footer text.
-  await sendTelegramMessage(msg.chat.id, 'text', '✅ Footer saved.', { isUserChat: true });
+bot.onText(/\/add_footer (.+)/, (msg, match) => {
+  saveToDatabase(msg.chat.id, 'footer', match[1].trim());
+  sendTelegramMessage(msg.chat.id, 'text', '✅ Footer saved.', { isUserChat: true });
 });
 
-// Handles the /set_channel command to configure the auto-post channel.
-// MODIFIED: Now supports both public (@username) and private (+invite_hash) Telegram channel links.
-bot.onText(/\/set_channel (.+)/, async (msg, match) => {
-  let inputChannel = match[1].trim(); // Get the raw input from the user (could be ID, @username, or link).
-
-  // Regex to attempt to extract @username from public links (t.me/username) OR the invite hash from private links (t.me/+invite_hash)
+bot.onText(/\/set_channel (.+)/, (msg, match) => {
+  let inputChannel = match[1].trim();
   const telegramLinkRegex = /(?:https?:\/\/)?(?:t\.me|telegram\.me)\/([a-zA-Z0-9_+-]+)/i;
   const matchLink = inputChannel.match(telegramLinkRegex);
-
   if (matchLink && matchLink[1]) {
     const extractedPart = matchLink[1];
-    // If the extracted part starts with '+', it's likely a private invite hash.
-    // Otherwise, it's a username.
-    if (extractedPart.startsWith('+')) {
-      inputChannel = extractedPart; // Keep the invite hash as is (Telegram accepts it directly).
-      console.log(`Extracted private channel invite hash from link: ${inputChannel}`);
-    } else {
-      inputChannel = `@${extractedPart}`; // Prefix with '@' for public channel usernames.
-      console.log(`Extracted public channel username from link: ${inputChannel}`);
-    }
+    inputChannel = extractedPart.startsWith('+') ? extractedPart : `@${extractedPart}`;
   }
-
-  // Now, validate the processed channel ID/username.
-  // It should start with '-100' for numeric private channel IDs, '@' for public channel usernames, or '+' for private invite links.
   if (!inputChannel.startsWith('-100') && !inputChannel.startsWith('@') && !inputChannel.startsWith('+')) {
-      await sendTelegramMessage(msg.chat.id, 'text', '⚠️ Please provide a valid channel ID, @username, or a Telegram channel invite link (e.g., `-1001234567890`, `@MyChannel`, or `https://t.me/+invite_hash`).', { isUserChat: true, parse_mode: 'Markdown' });
-      return;
+    sendTelegramMessage(msg.chat.id, 'text', '⚠️ Please provide a valid channel ID, @username, or a Telegram channel invite link.', { isUserChat: true });
+    return;
   }
-
-  saveToDatabase(msg.chat.id, 'channel', inputChannel); // Save the validated channel identifier.
-  await sendTelegramMessage(msg.chat.id, 'text', `✅ Channel set to: \`${inputChannel}\`. Please ensure I am an **administrator** in this channel with permission to post messages.`, { parse_mode: 'Markdown', isUserChat: true });
+  saveToDatabase(msg.chat.id, 'channel', inputChannel);
+  sendTelegramMessage(msg.chat.id, 'text', `✅ Channel set to: \`${inputChannel}\`. Please ensure I am an **administrator** in this channel.`, { parse_mode: 'Markdown', isUserChat: true });
 });
 
-// Handles the /remove_channel command to disable auto-posting.
-bot.onText(/\/remove_channel/, async (msg) => {
-  const removed = deleteFromDatabase(msg.chat.id, 'channel'); // Remove the channel setting.
-  await sendTelegramMessage(msg.chat.id, 'text', removed ? '✅ Channel removed.' : 'ℹ️ No channel was set.', { isUserChat: true });
+bot.onText(/\/remove_channel/, (msg) => {
+  const removed = deleteFromDatabase(msg.chat.id, 'channel');
+  sendTelegramMessage(msg.chat.id, 'text', removed ? '✅ Channel removed.' : 'ℹ️ No channel was set.', { isUserChat: true });
 });
 
-// Handles the /my_channel command to show the current auto-post channel.
-bot.onText(/\/my_channel/, async (msg) => {
-  const channel = getFromDatabase(msg.chat.id, 'channel'); // Retrieve the channel setting.
-  await sendTelegramMessage(msg.chat.id, 'text', channel ? `📢 Your current auto-post channel: \`${channel}\`` : 'No auto-post channel is set.', { parse_mode: 'Markdown', isUserChat: true });
+bot.onText(/\/my_channel/, (msg) => {
+  const channel = getFromDatabase(msg.chat.id, 'channel');
+  sendTelegramMessage(msg.chat.id, 'text', channel ? `📢 Your current auto-post channel: \`${channel}\`` : 'No auto-post channel is set.', { parse_mode: 'Markdown', isUserChat: true });
 });
 
-// Handles the /balance command to check the user's PowerURLShortener balance.
 bot.onText(/\/balance/, async (msg) => {
   const token = getFromDatabase(msg.chat.id, 'token');
   if (!token) {
-    return await sendTelegramMessage(msg.chat.id, 'text', '⚠️ Your API token is not set. Please set it using `/api YOUR_API_TOKEN` first.', { isUserChat: true });
+    return sendTelegramMessage(msg.chat.id, 'text', '⚠️ Your API token is not set. Use `/api YOUR_API_TOKEN`.', { isUserChat: true });
   }
-
   try {
-    console.log(`Attempting to fetch balance for chat ${msg.chat.id}.`);
     const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&action=userinfo`);
-    console.log('PowerURLShortener API response for balance:', res.data); // Log full API response for debugging.
-
-    if (res.data && res.data.status === 'success') {
-      await sendTelegramMessage(msg.chat.id, 'text', `💰 Balance: $${res.data.balance}\n👁️ Clicks: ${res.data.clicks}`, { isUserChat: true });
+    if (res.data?.status === 'success') {
+      sendTelegramMessage(msg.chat.id, 'text', `💰 Balance: $${res.data.balance}\n👁️ Clicks: ${res.data.clicks}`, { isUserChat: true });
     } else {
-      // If API returns an error message (e.g., 'invalid token'), display it.
-      const errorMessage = res.data && res.data.message ? res.data.message : 'Invalid API token or an unexpected error occurred on the shortening service.';
-      await sendTelegramMessage(msg.chat.id, 'text', `❌ Failed to fetch balance: ${errorMessage}`, { isUserChat: true });
+      sendTelegramMessage(msg.chat.id, 'text', `❌ Failed to fetch balance: ${res.data?.message || 'Invalid API token.'}`, { isUserChat: true });
     }
   } catch (error) {
     console.error(`Error fetching balance for chat ${msg.chat.id}:`, error.message);
-    // Log detailed response if available from axios error object.
-    if (error.response) {
-        console.error('API Error Response Data:', error.response.data);
-        console.error('API Error Response Status:', error.response.status);
-    }
-    await sendTelegramMessage(msg.chat.id, 'text', '🚫 Failed to fetch balance. This could be due to a network issue or the API being temporarily unavailable. Please try again later.', { isUserChat: true });
+    sendTelegramMessage(msg.chat.id, 'text', '🚫 Failed to fetch balance. The API might be down.', { isUserChat: true });
   }
 });
 
-// --- Main Message Handler for URL Shortening and Content Forwarding ---
-
-// Object to temporarily store media group messages until all parts are received.
-// Telegram sends parts of a media group separately, so we collect them before processing.
+// --- Main Message Handler ---
 const mediaGroups = {};
-
-// This handler processes ALL incoming messages (text, photos, videos, media groups).
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
-  // --- Pre-processing & Early Exits ---
-  // Ignore messages that are clearly commands (start with / and no spaces) to prevent re-processing.
-  if (msg.text && msg.text.startsWith('/') && msg.text.length > 1 && !msg.text.includes(' ')) {
-      return;
-  }
+  // Ignore commands
+  if (msg.text && msg.text.startsWith('/')) return;
 
-  // Check if the message was forwarded (from a user or another chat/channel).
-  const isForwarded = msg.forward_from || msg.forward_from_chat;
-  const autoPostChannel = getFromDatabase(chatId, 'channel'); // Get the user's configured auto-post channel.
-  const userApiToken = getFromDatabase(chatId, 'token'); // Get the user's API token.
-
-  // If no API token is set, inform the user and stop processing for shortening.
-  if (!userApiToken && !(msg.text && msg.text.startsWith('/api'))) { // Exclude `/api` command itself from this check.
-    await sendTelegramMessage(chatId, 'text', '⚠️ Your API token is not set. Please set it using `/api YOUR_API_TOKEN` to use the URL shortening features.', { parse_mode: 'Markdown', isUserChat: true });
+  // Check for API token
+  const userApiToken = getFromDatabase(chatId, 'token');
+  if (!userApiToken) {
+    sendTelegramMessage(chatId, 'text', '⚠️ Your API token is not set. Please set it using `/api YOUR_API_TOKEN` to use the bot.', { parse_mode: 'Markdown', isUserChat: true });
     return;
   }
 
-  // --- Handle Media Groups (multiple photos/videos sent together) ---
+  // --- Handle Media Groups ---
   if (msg.media_group_id) {
     const groupId = msg.media_group_id;
-
     if (!mediaGroups[groupId]) {
       mediaGroups[groupId] = [];
-      // Set a timeout to process the media group after a short delay (e.g., 500ms).
-      // This gives Telegram time to send all parts of the group, as they arrive as separate 'message' updates.
       setTimeout(async () => {
         const group = mediaGroups[groupId];
-        delete mediaGroups[groupId]; // Clear the group from temporary storage after processing.
-        if (!group?.length) return; // Exit if the group is empty for some reason.
+        delete mediaGroups[groupId];
+        if (!group?.length) return;
 
-        // The caption for a media group is typically attached to the first message in the group.
-        const caption = group.find(m => m.caption)?.caption || '';
-        const links = extractLinks(caption);
-        let updatedCaption = caption;
+        let originalCaption = group.find(m => m.caption)?.caption || '';
+        let processedCaption = originalCaption;
 
+        const links = extractLinks(originalCaption);
         if (links.length > 0) {
-          const shortened = await shortenMultipleLinks(chatId, links);
-          updatedCaption = await replaceLinksInText(caption, links, shortened);
+          const shortenedLinks = await shortenMultipleLinks(chatId, links);
+          processedCaption = await replaceLinksInText(originalCaption, links, shortenedLinks);
         }
-        
-        // **FIX:** Get header/footer AFTER processing links in the main content.
+
         const { header, footer } = getUserHeaderFooter(chatId);
-        const finalCaption = `${header}${updatedCaption}${footer}`;
+        const finalCaption = `${header}${processedCaption}${footer}`;
 
-        // Prepare the media array for `bot.sendMediaGroup`.
-        const media = group.map((m, i) => {
-            let mediaType = '';
-            let fileId = '';
-            if (m.photo) {
-                mediaType = 'photo';
-                fileId = m.photo[m.photo.length - 1].file_id;
-            } else if (m.video) {
-                mediaType = 'video';
-                fileId = m.video.file_id;
-            } else {
-                return null;
-            }
-
-            return {
-                type: mediaType,
-                media: fileId,
-                caption: i === 0 ? finalCaption : undefined
-            };
-        }).filter(Boolean);
+        const media = group.map((m, i) => ({
+          type: m.photo ? 'photo' : 'video',
+          media: m.photo ? m.photo[m.photo.length - 1].file_id : m.video.file_id,
+          caption: i === 0 ? finalCaption : undefined
+        }));
 
         if (media.length > 0) {
-            await sendTelegramMessage(chatId, 'mediaGroup', media, { reply_to_message_id: group[0].message_id, isUserChat: true });
-            if (autoPostChannel) {
-                await sendTelegramMessage(autoPostChannel, 'mediaGroup', media);
-            }
+          await sendTelegramMessage(chatId, 'mediaGroup', media, { reply_to_message_id: group[0].message_id, isUserChat: true });
+          const autoPostChannel = getFromDatabase(chatId, 'channel');
+          if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'mediaGroup', media);
         }
       }, 500);
     }
     mediaGroups[groupId].push(msg);
     return;
   }
-
-  // --- Handle Forwarded Single Photos and Videos ---
-  if (isForwarded && msg.photo) {
-    const caption = msg.caption || '';
-    const links = extractLinks(caption);
-    const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = await replaceLinksInText(caption, links, shortened);
-    
-    // **FIX:** Get header/footer AFTER processing links in the main content.
-    const { header, footer } = getUserHeaderFooter(chatId);
-    const finalCaption = `${header}${updated}${footer}`;
-    const photoId = msg.photo[msg.photo.length - 1].file_id;
-
-    await sendTelegramMessage(chatId, 'photo', photoId, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
-    if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'photo', photoId, { caption: finalCaption });
-    return;
-  }
-
-  if (isForwarded && msg.video) {
-    const caption = msg.caption || '';
-    const links = extractLinks(caption);
-    const shortened = await shortenMultipleLinks(chatId, links);
-    const updated = await replaceLinksInText(caption, links, shortened);
-
-    // **FIX:** Get header/footer AFTER processing links in the main content.
-    const { header, footer } = getUserHeaderFooter(chatId);
-    const finalCaption = `${header}${updated}${footer}`;
-
-    await sendTelegramMessage(chatId, 'video', msg.video.file_id, { caption: finalCaption, reply_to_message_id: msg.message_id, isUserChat: true });
-    if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'video', msg.video.file_id, { caption: finalCaption });
-    return;
-  }
-
-  // --- Handle Normal Messages (text, photo with caption, video with caption) ---
-  const content = msg.text || msg.caption || '';
-  const links = extractLinks(content);
   
-  // **FIX:** Get header/footer AFTER processing links in the main content.
-  const { header, footer } = getUserHeaderFooter(chatId);
-
+  // --- Handle All Other Messages (Text, Photo, Video) ---
+  
+  // 1. Get the original content (text or caption)
+  let originalContent = msg.text || msg.caption || '';
+  
+  // 2. Process links ONLY in the original content
+  let processedContent = originalContent;
+  const links = extractLinks(originalContent);
   if (links.length > 0) {
-    const shortened = await shortenMultipleLinks(chatId, links);
-    const updatedContent = await replaceLinksInText(content, links, shortened);
-    const finalContentWithHeaderFooter = `${header}${updatedContent}${footer}`;
-
-    if (msg.photo) {
-      const photoId = msg.photo[msg.photo.length - 1].file_id;
-      await sendTelegramMessage(chatId, 'photo', photoId, { caption: finalContentWithHeaderFooter, reply_to_message_id: msg.message_id, isUserChat: true });
-      if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'photo', photoId, { caption: finalContentWithHeaderFooter });
-    } else if (msg.video) {
-      await sendTelegramMessage(chatId, 'video', msg.video.file_id, { caption: finalContentWithHeaderFooter, reply_to_message_id: msg.message_id, isUserChat: true });
-      if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'video', msg.video.file_id, { caption: finalContentWithHeaderFooter });
-    } else {
-      await sendTelegramMessage(chatId, 'text', finalContentWithHeaderFooter, { reply_to_message_id: msg.message_id, isUserChat: true });
-      if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'text', finalContentWithHeaderFooter);
-    }
-  } else if (msg.text && !msg.text.startsWith('/')) {
-    const rawText = msg.text;
-    const finalContentWithHeaderFooter = `${header}${rawText}${footer}`;
-
-    if (finalContentWithHeaderFooter.trim() !== rawText.trim() || rawText.trim() !== '') {
-        await sendTelegramMessage(chatId, 'text', finalContentWithHeaderFooter, { reply_to_message_id: msg.message_id, isUserChat: true });
-        if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'text', finalContentWithHeaderFooter);
+    const shortenedLinks = await shortenMultipleLinks(chatId, links);
+    processedContent = await replaceLinksInText(originalContent, links, shortenedLinks);
+  }
+  
+  // 3. Get header and footer, then combine everything
+  // This is done AFTER link shortening is complete.
+  const { header, footer } = getUserHeaderFooter(chatId);
+  const finalOutput = `${header}${processedContent}${footer}`;
+  
+  // 4. Send the final message based on its type
+  const autoPostChannel = getFromDatabase(chatId, 'channel');
+  
+  if (msg.photo) {
+    const photoId = msg.photo[msg.photo.length - 1].file_id;
+    await sendTelegramMessage(chatId, 'photo', photoId, { caption: finalOutput, reply_to_message_id: msg.message_id, isUserChat: true });
+    if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'photo', photoId, { caption: finalOutput });
+  } else if (msg.video) {
+    const videoId = msg.video.file_id;
+    await sendTelegramMessage(chatId, 'video', videoId, { caption: finalOutput, reply_to_message_id: msg.message_id, isUserChat: true });
+    if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'video', videoId, { caption: finalOutput });
+  } else if (msg.text) {
+    // Only reply to text if there were links or if header/footer adds content
+    if (links.length > 0 || finalOutput.trim() !== originalContent.trim()) {
+      await sendTelegramMessage(chatId, 'text', finalOutput, { reply_to_message_id: msg.message_id, isUserChat: true });
+      if (autoPostChannel) await sendTelegramMessage(autoPostChannel, 'text', finalOutput);
     }
   }
 });
 
-console.log('Bot is running and listening for messages...');
-```
+console.log('Bot is running and listening for messages...')
