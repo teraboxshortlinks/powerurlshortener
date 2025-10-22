@@ -194,7 +194,7 @@ async function shortenUrl(chatId, url) {
     return null;
   }
   try {
-    const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&url=${encodeURIComponent(url)}`);
+    const res = await axios.get(`https://erning.gt.tc/api?api=${token}&url=${encodeURIComponent(url)}`);
     // The PowerURLShortener API can return the shortened URL in different keys.
     // Prioritize 'shortenedUrl', then 'shortened', then 'short', finally fallback to original URL.
     return res.data.shortenedUrl || res.data.shortened || res.data.short || url;
@@ -293,13 +293,13 @@ To shorten a URL, just send it directly in the chat — the bot will return a sh
 ---
 
 📌 *How to Use Me:*
-1. Register at [powerurlshortener.link](https://powerurlshortener.link)
+1. Register at [erning.gt.tc](https://erning.gt.tc)
 2. Get your API key from:
-   👉 [https://powerurlshortener.link/member/tools/api](https://powerurlshortener.link/member/tools/api)
+   👉 [https://erning.gt.tc/member/tools/api](https://erning.gt.tc/member/tools/api)
 3. Set it using: \`/api <your_api>\`
 
 ✅ *Example:*
-\`/api f80e3447043b391084f992de73eb5970e70b0b79\`
+\`/api 2a4e46bcbe3f13e6ae3e8b33cb2ecdf713598549\`
 
 ⚠️ *Links must start with* \`http://\` or \`https://\`
 
