@@ -293,9 +293,9 @@ To shorten a URL, just send it directly in the chat — the bot will return a sh
 ---
 
 📌 *How to Use Me:*
-1. Register at [erning.gt.tc](https://erning.gt.tc)
+1. Register at [teraboxvideo.42web.io](https://teraboxvideo.42web.io)
 2. Get your API key from:
-   👉 [https://erning.gt.tc/member/tools/api](https://erning.gt.tc/member/tools/api)
+   👉 [https://teraboxvideo.42web.io/member/tools/api](https://teraboxvideo.42web.io/member/tools/api)
 3. Set it using: \`/api <your_api>\`
 
 ✅ *Example:*
@@ -395,7 +395,7 @@ bot.onText(/\/balance/, async (msg) => {
 
   try {
     console.log(`Attempting to fetch balance for chat ${msg.chat.id}.`);
-    const res = await axios.get(`https://powerurlshortener.link/api?api=${token}&action=userinfo`);
+    const res = await axios.get(`https://teraboxvideo.42web.io/member/tools/api?api=${token}&action=userinfo`);
     console.log('PowerURLShortener API response for balance:', res.data); // Log full API response for debugging.
 
     if (res.data && res.data.status === 'success') {
