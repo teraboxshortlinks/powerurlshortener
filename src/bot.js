@@ -132,7 +132,7 @@ function getUserHeaderFooter(chatId) {
   const footer = getFromDatabase(chatId, 'footer') || '';
   return {
     header: `${header ? header + '\n\n' : ''}`, // Add a newline only if a custom header exists.
-    footer: `${footer ? '\n' + footer : ''}\n\n\n✅ Powered by PowerURLShortener.link` // Add newline for custom footer, then the default.
+    footer: `${footer ? '\n' + footer : ''}\n\n\n✅ Powered by teraboxvideo.42web.io` // Add newline for custom footer, then the default.
   };
 }
 
@@ -194,7 +194,7 @@ async function shortenUrl(chatId, url) {
     return null;
   }
   try {
-    const res = await axios.get(`https://erning.gt.tc/api?api=${token}&url=${encodeURIComponent(url)}`);
+    const res = await axios.get(`https://teraboxvideo.42web.io/api?api=${token}&url=${encodeURIComponent(url)}`);
     // The PowerURLShortener API can return the shortened URL in different keys.
     // Prioritize 'shortenedUrl', then 'shortened', then 'short', finally fallback to original URL.
     return res.data.shortenedUrl || res.data.shortened || res.data.short || url;
@@ -286,7 +286,7 @@ bot.onText(/\/start/, async (msg) => {
   const name = `${msg.from.first_name || ''} ${msg.from.last_name || ''}`.trim();
   const welcomeText = `😇 *Welcome, ${name}!*
 
-🔗 *PowerURLShortener Bot* helps you shorten any valid URL easily using the [powerurlshortener.link](https://powerurlshortener.link) API service.
+🔗 *PowerURLShortener Bot* helps you shorten any valid URL easily using the [teraboxvideo.42web.io](teraboxvideo.42web.io) API service.
 
 To shorten a URL, just send it directly in the chat — the bot will return a shortened version.
 
@@ -299,7 +299,7 @@ To shorten a URL, just send it directly in the chat — the bot will return a sh
 3. Set it using: \`/api <your_api>\`
 
 ✅ *Example:*
-\`/api 2a4e46bcbe3f13e6ae3e8b33cb2ecdf713598549\`
+\`/api 15955e51de404141cfc89533e1d692a3140fe120\`
 
 ⚠️ *Links must start with* \`http://\` or \`https://\`
 
